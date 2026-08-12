@@ -1,0 +1,192 @@
+<!DOCTYPE html><html lang="ko" style="width: 1280px; height: 904px; overflow: hidden; position: relative;"><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"><script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script></head><body class="flex items-center justify-center min-h-screen p-4 md:p-10">
+<!-- BEGIN: Main Dashboard Container -->
+<main class="relative w-full max-w-6xl aspect-[4/3] bg-white/40 backdrop-blur-xl rounded-[2.5rem] shadow-2xl overflow-hidden flex border border-white/40" data-purpose="dashboard-main">
+    
+    <!-- BEGIN: Left Sidebar -->
+    <aside class="w-20 flex flex-col items-center py-8 gap-10 glass-sidebar" data-purpose="sidebar-navigation">
+        <div class="mb-4">
+            <!-- Fire Dept Logo -->
+            <div class="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center shadow-lg shadow-red-200">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.99 7.99 0 0120 13a7.98 7.98 0 01-2.343 5.657z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+                    <path d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+                </svg>
+            </div>
+        </div>
+        <nav class="flex flex-col gap-6" data-purpose="nav-icons">
+            <button class="p-3 glass-card rounded-xl hover:bg-white/60 transition-colors shadow-sm">
+                <svg class="h-5 w-5 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+                </svg>
+            </button>
+            <div class="flex flex-col gap-3 bg-white/20 p-2 rounded-2xl border border-white/20">
+                <button class="p-3 glass-card rounded-xl shadow-sm text-red-600">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+                    </svg>
+                </button>
+                <button class="p-3 hover:glass-card rounded-xl transition-colors text-gray-500 hover:text-gray-800">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+                    </svg>
+                </button>
+                <button class="p-3 hover:glass-card rounded-xl transition-colors text-gray-500 hover:text-gray-800">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+                    </svg>
+                </button>
+                <button class="p-3 hover:glass-card rounded-xl transition-colors text-gray-500 hover:text-gray-800">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924-1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+                        <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+                    </svg>
+                </button>
+            </div>
+        </nav>
+    </aside>
+    <!-- END: Left Sidebar -->
+
+    <!-- BEGIN: Right Content Side -->
+    <div class="flex-1 flex flex-col p-8 overflow-hidden relative">
+        <!-- BEGIN: Top Header -->
+        <header class="flex justify-between items-center mb-6" data-purpose="top-navigation">
+            <div class="flex bg-white/20 backdrop-blur-md p-1 rounded-2xl gap-1 border border-white/20">
+                <button class="px-6 py-2 glass-card rounded-xl shadow-sm text-sm font-bold text-red-600">긴급 출동</button>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2 glass-card px-4 py-2 rounded-2xl text-xs font-medium">
+                    <span class="flex h-2 w-2 relative">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                    </span>
+                    <span class="text-gray-800">현재 위치: <span class="font-bold">서울특별시장</span></span>
+                </div>
+                <button class="p-2.5 glass-card rounded-xl shadow-sm">
+                    <svg class="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+                    </svg>
+                </button>
+            </div>
+        </header>
+        <!-- END: Top Header -->
+
+        <!-- BEGIN: Vehicle Hero Section -->
+        <section class="relative flex-1 mb-8" data-purpose="car-hero">
+            <div class="relative z-10">
+                <h1 class="text-5xl font-bold text-gray-800 tracking-tight">주력 펌프차 01</h1>
+                <p class="text-lg text-red-600 font-bold mt-1">긴급 대응 대기 중</p>
+                <div class="flex gap-2 mt-6">
+                    <span class="px-3 h-6 rounded-full bg-red-600 text-white flex items-center justify-center text-[10px] font-bold shadow-sm">출동가능</span>
+                    <span class="px-3 h-6 rounded-full bg-white/40 backdrop-blur-sm text-gray-800 flex items-center justify-center text-[10px] font-bold border border-white/30">장비점검</span>
+                    <span class="px-3 h-6 rounded-full bg-white/40 backdrop-blur-sm text-gray-800 flex items-center justify-center text-[10px] font-bold border border-white/30">수급완료</span>
+                </div>
+            </div>
+            <!-- Fire Truck Image -->
+            <div class="absolute inset-0 flex items-center justify-center pt-20 pointer-events-none">
+                <img alt="Emergency Vehicle" class="w-2/3 object-contain vehicle-shadow" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAL0ltUbwZ-cbBZyWZEBYM3XJdslN9NjvISKtYlzBi1YC5aUgHIyo6qFVRpYia8FZZ4bXM4p0p0KX9Xn2yFq3dvyLO4H90_MjelD1aAy9fMQ1WejHSteJA1buT8w5RR3JdgytmfCB76xICRy4cC-6k0_3wlKFcEr78eCrVdlqur8bdrShg73ONsrpa9XOmfsaUq7i460G_4t1uBzOzu7YiCxfPgSJb4EZXRedpbnjnMZqa3WDMRWT-tZvYT7ZjOFLHOBaDh02Z31Zo">
+            </div>
+            <!-- Right Side Utility Icons -->
+            <div class="absolute right-0 top-1/2 -translate-y-1/2 flex flex-col gap-3" data-purpose="side-utility-icons">
+                <button class="p-3 glass-card rounded-xl hover:bg-white/60 transition-colors shadow-sm">
+                    <svg class="h-5 w-5 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+                    </svg>
+                </button>
+                <button class="p-3 glass-card rounded-xl hover:bg-white/60 transition-colors shadow-sm">
+                    <svg class="h-5 w-5 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+                    </svg>
+                </button>
+            </div>
+            <!-- Incident Details Widget (-->
+            <div class="absolute right-0 bottom-4 w-[340px] glass-card rounded-[2.5rem] shadow-2xl border-l-4 border-l-red-500 px-6 py-12" data-purpose="incident-details-widget">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h3 class="font-bold text-gray-900 text-lg">신고 내용</h3>
+                        <p class="text-xs text-red-600 font-bold">최우선 순위: 화재 발생</p>
+                    </div>
+                    <div class="bg-red-100/60 backdrop-blur-sm text-red-700 px-2 py-1 rounded-lg text-[10px] font-bold border border-red-200/50">실시간</div>
+                </div>
+                <div class="mb-6 gap-6 flex-col">
+                    <div class="glass-inset p-4 rounded-2xl">
+                        <div class="flex items-center gap-2 mb-2">
+                            <svg class="h-4 w-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+                                <path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+                            </svg>
+                            <span class="text-xs font-bold text-gray-900">사건 발생 주소</span>
+                        </div>
+                        <p class="text-xs text-gray-700 leading-relaxed font-medium">서울특별시 종로구 세종대로 172<br>(세종문화회관 인근 상가)</p>
+                    </div>
+                    <div class="glass-inset p-4 rounded-2xl">
+                        <div class="flex items-center gap-2 mb-2">
+                            <svg class="h-4 w-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+                            </svg>
+                            <span class="text-xs font-bold text-gray-900">신고 접수 내용</span>
+                        </div>
+                        <p class="text-xs text-gray-800 italic font-medium">"식당 주방에서 불꽃이 보이고 검은 연기가 심하게 발생하고 있습니다. 인명 피해 우려됩니다."</p>
+                    </div>
+                </div>
+                <button class="w-full py-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-2xl flex items-center justify-center gap-3 shadow-lg shadow-red-200 transition-all active:scale-95">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+                    </svg>
+                    <span class="">안내 시작</span>
+                </button>
+            </div>
+        </section>
+        <!-- END: Vehicle Hero Section -->
+
+        <!-- BEGIN: Bottom Grid Cards -->
+        <div class="grid grid-cols-3 gap-6" data-purpose="bottom-details-grid">
+            <!-- My Location Card -->
+            <div class="glass-card p-6 rounded-[2.5rem] relative h-48 overflow-hidden group shadow-sm">
+                <div class="flex justify-between items-start mb-2 relative z-10">
+                    <div>
+                        <h4 class="text-sm font-bold text-gray-900">내 위치</h4>
+                        <p class="text-[10px] text-gray-600 font-medium">종로구 소방센터 기지</p>
+                    </div>
+                    <button class="p-1.5 glass-inset rounded-lg shadow-sm">
+                        <svg class="h-3 w-3 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+                        </svg>
+                    </button>
+                </div>
+                <!-- Map Background -->
+                <div class="absolute inset-0 top-16 bg-gray-400/20 transition-opacity">
+                    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+                        <div class="w-10 h-10 bg-red-600 rounded-full flex items-center justify-center ring-8 ring-red-600/30">
+                            <div class="w-3 h-3 bg-white rounded-full"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Shift Schedule / Incident Log Card -->
+            <div class="glass-card p-6 rounded-[2.5rem] h-48 flex flex-col justify-between shadow-sm">
+                <div class="flex justify-between items-start mb-2">
+                    <div>
+                        <h4 class="text-sm font-bold text-gray-900">근무 일정</h4>
+                        <p class="text-[10px] text-gray-600 font-medium">7월 20일 - 주간 교대</p>
+                    </div>
+                    <button class="p-1.5 glass-inset rounded-lg shadow-sm">
+                        <svg class="h-3 w-3 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3 glass-inset p-3 rounded-2xl shadow-sm flex-1">
+                        <button class="p-1 glass-card border-none rounded-lg text-gray-800 hover:bg-white/40"><svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M15 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class=""></path></svg></button>
+                        <div class="text-center">
+                            <span class="text-3xl font-bold block text-gray-900">20</span>
+                            <span class="text-[10px] text-red-600 font-bold uppercase">7월</span>
+                        </div>
+                        <button class="p-1 glass-card border-none rounded-lg text-gray-800 hover:bg-white/40"><svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg></button>
+                    </div>
+                    <div class="mx-4 text-white/30">|</div>
+                    <div class="text-center flex-1">
+                        <span class="text-3xl font-bold block leading-tight text-gray-900">10:25</span>
+                        <span class="text-[10px] text-gray-600 font-bold uppercase">오전</span>
+                    </div>
+                </div></div></div></div></main></body></html>

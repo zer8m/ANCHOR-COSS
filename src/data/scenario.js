@@ -79,7 +79,7 @@ export const obstacles = [
   {
     id: 'o2',
     distanceM: 2350,
-    cause: { type: '불법주정차', vehicleCount: 3, effectiveWidthM: 2.6 },
+    cause: { type: '불법주정차', vehicleCount: 3, effectiveWidthM: 2.7 }, // 소형(필요 2.6)은 통과, 중형 이상(3.0~)은 불가
   },
 ]
 

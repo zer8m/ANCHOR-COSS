@@ -6,9 +6,11 @@ import { VEHICLES, requiredWidthM } from '../data/vehicles.js'
 const byId = (id) => VEHICLES.find((v) => v.id === id)
 
 // 부동소수 오차 없이 0.1m 단위 (2.3 + 0.4 = 2.6999… 방지).
-assert.equal(requiredWidthM({ widthM: 2.3 }), 2.7)
-assert.equal(requiredWidthM(byId('pump-m')), 2.9)
-assert.equal(requiredWidthM(byId('ambulance')), 2.4)
+assert.equal(requiredWidthM({ widthM: 2.3, clearanceM: 0.4 }), 2.7)
+// 여유폭은 차종별 값: 같은 차폭이라도 여유폭이 다르면 필요 통과폭이 달라진다.
+assert.equal(requiredWidthM({ widthM: 2.5, clearanceM: 0.6 }), 3.1)
+assert.equal(requiredWidthM(byId('pump-m')), 3.0)
+assert.equal(requiredWidthM(byId('ambulance')), 2.3)
 
 const primary = { path: [{ lat: 1, lng: 1 }], guides: [], distanceM: 100, durationSec: 10 }
 const detour = { path: [{ lat: 2, lng: 2 }], guides: [], distanceM: 150, durationSec: 15, avoids: ['b'] }
@@ -34,7 +36,7 @@ assert.deepEqual(pump.segments, [
   { id: 'a', pos: { lat: 1, lng: 1 }, passable: true },
   { id: 'b', pos: { lat: 1, lng: 2 }, passable: false },
 ])
-assert.equal(pump.requiredWidthM, 2.9)
+assert.equal(pump.requiredWidthM, 3.0)
 assert.equal(pump.vehicleId, 'pump-m')
 
 // 단말로 나가는 페이로드에 계산 근거(잔여 폭)는 싣지 않는다 — 판정 결과만.

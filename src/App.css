@@ -2843,6 +2843,20 @@
   display: grid;
   gap: 10px;
 }
+.tnavi-vsub {
+  margin: 18px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid #eceef1;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.tnavi-vcriteria .tnavi-vmeaning {
+  color: #6b7480;
+}
+.tnavi-vcriteria .tnavi-vnote {
+  margin-top: 2px;
+}
 .tnavi-vcriteria dt {
   font-size: 14px;
   font-weight: 700;

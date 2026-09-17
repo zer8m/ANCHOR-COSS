@@ -11,8 +11,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@tensorflow-models/coco-ssd": "^2.2.3",
-    "@tensorflow/tfjs": "^4.22.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-kakao-maps-sdk": "^1.2.1"

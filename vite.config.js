@@ -5,12 +5,12 @@ import react from '@vitejs/plugin-react'
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const restKey = env.KAKAO_REST_KEY || ''
-  const geminiKey = env.GEMINI_API_KEY || ''
 
   return {
     plugins: [react()],
     server: {
-      // 외부 API는 브라우저 직접 호출 시 CORS로 막힘 → dev 프록시로 우회, 키는 서버측(여기)에만.
+      // 경로 fixture 캡처(scripts/capture-routes.mjs) 전용 프록시. REST 키는 서버측(여기)에만.
+      // 앱 런타임은 이 프록시를 호출하지 않는다.
       proxy: {
         '/kakao-navi': {
           target: 'https://apis-navi.kakaomobility.com',
@@ -19,16 +19,6 @@ export default defineConfig(({ mode }) => {
           configure: (proxy) => {
             proxy.on('proxyReq', (proxyReq) => {
               if (restKey) proxyReq.setHeader('Authorization', `KakaoAK ${restKey}`)
-            })
-          },
-        },
-        '/gemini': {
-          target: 'https://generativelanguage.googleapis.com',
-          changeOrigin: true,
-          rewrite: (p) => p.replace(/^\/gemini/, ''),
-          configure: (proxy) => {
-            proxy.on('proxyReq', (proxyReq) => {
-              if (geminiKey) proxyReq.setHeader('x-goog-api-key', geminiKey)
             })
           },
         },

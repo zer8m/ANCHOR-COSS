@@ -98,7 +98,6 @@ src/
     geo.js                  haversine, 경로 투영, 점–경로 거리, 우회 경유지
     directions.js           Kakao 길찾기 호출·파싱 (캡처 스크립트 전용)
 scripts/capture-routes.mjs  경로 fixture 캡처
-docs/superpowers/plans/     구현 계획서
 ```
 
 ## 범위 밖 / 한계

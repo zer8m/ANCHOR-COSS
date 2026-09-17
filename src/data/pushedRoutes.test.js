@@ -5,15 +5,15 @@ import routes from './pushedRoutes.js'
 import { obstacles, AVOID_MIN_M } from './scenario.js'
 import { VEHICLES } from './vehicles.js'
 import { buildPush } from '../lib/center.js'
-import { minDistanceToPath, pointAtDistance, haversine } from '../lib/geo.js'
+import { minDistanceToPath, nearestOnPath, haversine } from '../lib/geo.js'
 
 assert.ok(routes.primary.path.length >= 2 && routes.detour.path.length >= 2, '경로가 비어 있음')
 for (const o of obstacles) assert.ok(routes.segmentPos[o.id], `segmentPos.${o.id} 없음`)
 
-// fixture가 현재 scenario로 캡처된 것인지: distanceM을 다시 투영한 좌표가 저장된 segmentPos와 같아야 한다.
+// fixture가 현재 scenario로 캡처된 것인지: pos를 원 경로에 다시 투영한 좌표가 저장된 segmentPos와 같아야 한다.
 for (const o of obstacles) {
   assert.ok(
-    haversine(pointAtDistance(routes.primary.path, o.distanceM), routes.segmentPos[o.id]) < 1,
+    haversine(nearestOnPath(routes.primary.path, o.pos).point, routes.segmentPos[o.id]) < 1,
     `${o.id}: fixture가 현재 scenario와 어긋남 — node scripts/capture-routes.mjs 재실행 필요`,
   )
 }

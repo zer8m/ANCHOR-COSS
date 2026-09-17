@@ -46,6 +46,31 @@ export function minDistanceToPath(path, p) {
   return best
 }
 
+// 점 p를 경로(선분들)에 투영: { distM: 경로 시작부터의 누적거리, point: 투영점, offM: p와의 거리 }.
+export function nearestOnPath(path, p) {
+  const mLat = 111320
+  const mLng = 111320 * Math.cos((p.lat * Math.PI) / 180)
+  let best = { distM: 0, point: path[0] ?? null, offM: Infinity }
+  let acc = 0
+  for (let i = 1; i < path.length; i++) {
+    const a = path[i - 1]
+    const b = path[i]
+    const ax = (a.lng - p.lng) * mLng
+    const ay = (a.lat - p.lat) * mLat
+    const dx = (b.lng - a.lng) * mLng
+    const dy = (b.lat - a.lat) * mLat
+    const len2 = dx * dx + dy * dy
+    const t = len2 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / len2)) : 0
+    const offM = Math.hypot(ax + t * dx, ay + t * dy)
+    const seg = haversine(a, b)
+    if (offM < best.offM) {
+      best = { distM: acc + seg * t, point: { lat: a.lat + (b.lat - a.lat) * t, lng: a.lng + (b.lng - a.lng) * t }, offM }
+    }
+    acc += seg
+  }
+  return best
+}
+
 // 막힌 지점(distanceM)을 경로에서 찾아, 진행방향 수직으로 offsetM 떨어진 경유지 반환.
 // 이 경유지로 길찾기하면 막힌 구간을 피해 도는 우회 경로가 나옴. (Kakao는 특정 도로 제외 미지원 → 경유지로 우회 유도)
 export function detourWaypoint(path, distanceM, offsetM = 350) {

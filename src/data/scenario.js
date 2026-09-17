@@ -1,25 +1,25 @@
 // 데모 시나리오 mock 데이터.
-// 무대: 서울 마포구 연남동 주택가 좁은 골목 (실제 도로망 위 임의 좌표).
+// 무대: 서울 종로구 창신동 (을지로119안전센터 → 창신시장 인근 → 창신6길 주택가).
 // 실제 배포 시 이 파일을 서버/공공 API 응답으로 교체.
+// ⚠️ 출발·목적지·obstacles 좌표를 바꾸면 `node scripts/capture-routes.mjs`로 경로 fixture를 다시 만들 것.
 
 export const dispatch = {
   id: 'D-2026-0721-014',
-  incident: '주택 화재 · 온새미로 주택',
-  // 목적지: 대전 유성구 대학로137번길 46 (온새미로 주택)
-  destination: { name: '대학로137번길 46 온새미로 주택', lat: 36.36312, lng: 127.34899 },
-  // 출발: 대전 둔산소방서 월평119안전센터
-  currentPos: { lat: 36.36, lng: 127.36688, heading: 280 }, // heading: 북=0, 시계방향(deg)
-  distanceM: 1700,
+  incident: '주택 화재 · 창신6길 주택가',
+  destination: { name: '창신6길 주택가', lat: 37.57657, lng: 127.01174 },
+  // 출발: 서울 중부소방서 을지로119안전센터
+  currentPos: { lat: 37.5666, lng: 127.01195, heading: 0 }, // heading: 북=0, 시계방향(deg)
+  distanceM: 1800,
   etaMin: 5,
   speedKmh: 32,
 
   // 브리핑 화면용 신고·출동 정보
-  station: '대전 둔산소방서 월평119안전센터',
-  vehicle: '고가사다리차 · 마포 사다리1',
+  station: '서울 중부소방서 을지로119안전센터',
+  vehicle: '중형펌프차 · 을지로 펌프1',
   responseLevel: '대응 1단계',
   reportedAt: '07.21 · 09:42',
   reportText:
-    '연남동 239-12 다세대주택 3층에서 연기 다량 발생. 거주자 2명 소재 미확인, 인명 구조 요청. 진입로 불법주정차 신고 접수.',
+    '창신6길 다세대주택 3층에서 연기 다량 발생. 거주자 2명 소재 미확인, 인명 구조 요청. 창신시장 인근 진입로 불법주정차 신고 접수.',
   tags: ['인명 위험', '3층 다세대', '진입로 협소'],
   truckImage: '/truck.png', // public/truck.png (배경 투명 PNG). 없으면 플레이스홀더로 폴백.
 }
@@ -31,17 +31,17 @@ export const briefing = {
   standby: 'EMERGENCY ON STANDBY',
   chips: ['출동가능', '장비점검', '주간편성'],
   priority: '최우선 순위: 화재 발생',
-  address: '대전광역시 유성구 대학로137번길 46',
-  addressSub: '(온새미로 주택 · 원룸촌 밀집지역)',
+  address: '서울특별시 종로구 창신6길',
+  addressSub: '(창신동 주택가 · 좁은 골목 밀집지역)',
   // 카카오내비 목적지
-  naviDest: { name: '대학로137번길 46 온새미로 주택', lat: 36.36312, lng: 127.34899 },
-  stationBase: '월평119안전센터',
+  naviDest: { name: '창신6길 주택가', lat: 37.57657, lng: 127.01174 },
+  stationBase: '을지로119안전센터',
   shiftLabel: '7월 20일 · 주간 교대',
   date: { day: '20', month: 'JULY', time: '10:25', ampm: 'A.M.' },
   report: [
-    { label: '발생 지점', text: '3층 원룸 건물 2층에서 연기·불꽃 식별' },
-    { label: '인명 현황', text: '원룸 다수 세대 거주, 미처 대피하지 못한 인원 3명 추정' },
-    { label: '위험 요소', text: '좁은 골목·불법주정차로 진입로 협소, 원룸촌 건물 밀집' },
+    { label: '발생 지점', text: '3층 다세대주택 2층에서 연기·불꽃 식별' },
+    { label: '인명 현황', text: '다세대 다수 세대 거주, 미처 대피하지 못한 인원 3명 추정' },
+    { label: '위험 요소', text: '좁은 골목·창신시장 인근 불법주정차로 진입로 협소, 주택 밀집' },
     { label: '현장 상황', text: '선착대 도착 3분 전, 인명 구조 우선 · 추가 지원 요청됨' },
   ],
 }
@@ -66,19 +66,18 @@ export const routes = {
   alternateExtraMin: 2,
 }
 
-// CCTV 판정 구간. effectiveWidthM = 주차 차량을 뺀 잔여 통과 폭(m).
-// 통과 여부는 데이터에 두지 않는다 — 차종별 필요 통과폭과 대조해 센터(center.js)가 판정.
 // 우회 경로가 막힌 지점에서 최소 이만큼(m) 떨어져야 "피했다"로 인정. 캡처 스크립트와 fixture 테스트가 공유.
 export const AVOID_MIN_M = 40
+
+// CCTV 판정 구간. effectiveWidthM = 주차 차량을 뺀 잔여 통과 폭(m).
+// 통과 여부는 데이터에 두지 않는다 — 차종별 필요 통과폭과 대조해 센터(center.js)가 판정.
+// pos: 기획상 지점은 창신시장 골목(37.57318, 127.01142)이나, 그 골목은 Kakao 자동차 도로망에 없어
+//      최단 경로가 지나는 최근접 지점(창신길 · 시장 입구, 서쪽 65m)으로 옮겨 둠.
 export const obstacles = [
   {
     id: 'o1',
-    distanceM: 2180, // 원 경로 위 지점 (총 ~2505m)
-    cause: { type: '불법주정차', vehicleCount: 1, effectiveWidthM: 3.5 }, // 전 차종 통과(최대 필요폭 3.3)
-  },
-  {
-    id: 'o2',
-    distanceM: 2350,
+    name: '창신시장 인근 (창신길)',
+    pos: { lat: 37.57313, lng: 127.01069 },
     cause: { type: '불법주정차', vehicleCount: 3, effectiveWidthM: 2.9 }, // 구급차(2.8)·경형(2.7)은 통과, 소형(3.0) 이상은 불가
   },
 ]

@@ -76,7 +76,7 @@ export default function Briefing({ onStart }) {
     ;[...w.querySelectorAll('p, span')].forEach((el) => {
       if (el.children.length) return
       const t = (el.textContent || '').trim()
-      if (t.includes('대학로') || t.includes('유성구') || t.includes('세종대로')) el.style.fontSize = '15px'
+      if (t === briefing.address || t.includes('세종대로')) el.style.fontSize = '15px'
     })
   }
 

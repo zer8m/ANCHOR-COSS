@@ -66,29 +66,18 @@ export const routes = {
   alternateExtraMin: 2,
 }
 
-// 소방차 표준 진입 필요폭(m). 판정 기준.
-export const REQUIRED_WIDTH_M = 2.5
-
+// CCTV 판정 구간. effectiveWidthM = 주차 차량을 뺀 잔여 통과 폭(m).
+// 통과 여부는 데이터에 두지 않는다 — 차종별 필요 통과폭과 대조해 센터(center.js)가 판정.
 export const obstacles = [
   {
     id: 'o1',
-    pos: { lat: 37.5627, lng: 126.9251 },
-    distanceM: 2180, // 도착지 근처 CCTV 구간 (총 ~2505m)
-    cause: { type: '불법주정차', vehicleCount: 1, effectiveWidthM: 2.9 },
-    requiredWidthM: REQUIRED_WIDTH_M,
-    passable: true,
-    severity: 'warning',
-    cctvVideo: '/cctv/entry-a.mp4',
+    distanceM: 2180, // 원 경로 위 지점 (총 ~2505m)
+    cause: { type: '불법주정차', vehicleCount: 1, effectiveWidthM: 3.2 },
   },
   {
     id: 'o2',
-    pos: { lat: 37.5634, lng: 126.9248 },
-    distanceM: 2350, // 도착지 근처 CCTV 구간 · 통과불가 (총 ~2505m)
-    cause: { type: '불법주정차', vehicleCount: 3, effectiveWidthM: 2.1 },
-    requiredWidthM: REQUIRED_WIDTH_M,
-    passable: false,
-    severity: 'blocked',
-    cctvVideo: '/cctv/entry-b.mp4',
+    distanceM: 2350,
+    cause: { type: '불법주정차', vehicleCount: 3, effectiveWidthM: 2.6 },
   },
 ]
 

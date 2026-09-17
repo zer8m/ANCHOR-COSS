@@ -50,14 +50,15 @@ function sectionsToGuides(sections = []) {
 
 // origin/destination: {lat, lng}. waypoints: [{lat,lng}...] (위험구간 회피용 경유지).
 // 성공 시 경로 배열(0=추천, 1=대안) 반환, 실패 시 throw.
-export async function getRoutes(origin, destination, waypoints = []) {
+// base: node 스크립트에서 절대 URL(예: http://localhost:5173)로 호출할 때 사용.
+export async function getRoutes(origin, destination, waypoints = [], base = '') {
   const o = `${origin.lng},${origin.lat}`
   const d = `${destination.lng},${destination.lat}`
   const wp = waypoints.length
     ? `&waypoints=${waypoints.map((w) => `${w.lng},${w.lat}`).join('|')}`
     : ''
   // 긴급출동 → 최소시간(TIME) 경로. (RECOMMEND는 이 구간에서 더 길고 느렸음)
-  const url = `/kakao-navi/v1/directions?origin=${o}&destination=${d}${wp}&priority=TIME&alternatives=true`
+  const url = `${base}/kakao-navi/v1/directions?origin=${o}&destination=${d}${wp}&priority=TIME&alternatives=true`
 
   const res = await fetch(url)
   if (!res.ok) throw new Error(`HTTP ${res.status}`)

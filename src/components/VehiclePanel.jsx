@@ -1,4 +1,4 @@
-import { VEHICLES, ENTRY_CRITERIA, CRITERIA_SOURCE, LEGAL_BASIS, SPEC_SOURCE, SPEC_SOURCE_URL, requiredWidthM } from '../data/vehicles.js'
+import { VEHICLES, ENTRY_CRITERIA, CRITERIA_SOURCE, LEGAL_BASIS, SPEC_SOURCE, SPEC_SOURCE_URL, CLEARANCE_SOURCE, CLEARANCE_SOURCE_URL, requiredWidthM } from '../data/vehicles.js'
 
 // 진입 기준 + 차종별 제원 표. 행을 고르면 출동 차종이 바뀌고 센터 판정이 다시 계산된다.
 export default function VehiclePanel({ vehicleId, onSelect, onClose }) {
@@ -39,6 +39,9 @@ export default function VehiclePanel({ vehicleId, onSelect, onClose }) {
         </tbody>
       </table>
       <p className="tnavi-vnote">필요 통과폭 = 차폭 + 차종별 여유폭 · 잔여 폭이 이보다 좁으면 진입 불가</p>
+      <p className="tnavi-vnote">
+        여유폭: <a href={CLEARANCE_SOURCE_URL} target="_blank" rel="noreferrer">{CLEARANCE_SOURCE}</a>
+      </p>
       <p className="tnavi-vnote">
         제원: <a href={SPEC_SOURCE_URL} target="_blank" rel="noreferrer">{SPEC_SOURCE}</a> (규격 상한값)
       </p>

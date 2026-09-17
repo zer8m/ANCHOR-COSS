@@ -74,12 +74,12 @@ export const obstacles = [
   {
     id: 'o1',
     distanceM: 2180, // 원 경로 위 지점 (총 ~2505m)
-    cause: { type: '불법주정차', vehicleCount: 1, effectiveWidthM: 3.2 },
+    cause: { type: '불법주정차', vehicleCount: 1, effectiveWidthM: 3.5 }, // 전 차종 통과(최대 필요폭 3.3)
   },
   {
     id: 'o2',
     distanceM: 2350,
-    cause: { type: '불법주정차', vehicleCount: 3, effectiveWidthM: 2.7 }, // 소형(필요 2.6)은 통과, 중형 이상(3.0~)은 불가
+    cause: { type: '불법주정차', vehicleCount: 3, effectiveWidthM: 2.9 }, // 구급차(2.8)·경형(2.7)은 통과, 소형(3.0) 이상은 불가
   },
 ]
 

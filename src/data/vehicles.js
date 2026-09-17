@@ -57,17 +57,19 @@ export const SPEC_SOURCE_URL =
 
 // clearanceM = 차종별 통과 여유폭(m). 차폭에 더해 필요 통과폭을 만든다.
 // (차폭 == 잔여 폭이면 사이드미러·측면 여유가 없어 실제로는 못 지나감)
-// ⚠️ 잠정값. 근거: 소방청 진입곤란 기준이 "중형펌프차(폭 2.5m) ↔ 도로 폭 3m"를 짝지으므로 중형 = 0.5m를 기준점으로 잡고,
-//    차체가 작을수록 줄이고(경형·구급차 0.3, 소형 0.4) 전장이 길어 골목에서 차체가 더 쓸리는 고가사다리차는 늘림(0.6).
-//    법령·규격에 "필요 통과폭" 수치는 없다 — 소방서 면담 등으로 확인되면 교체할 것.
+// 전 차종 0.8m. 근거: 현직 소방관 의견 "도로 폭이 최소 3.25m는 넘어야 소방차 진입 가능(4m는 돼야 원활)" —
+//    중형펌프차 폭 2.5m 대비 여유 0.75m ≈ 0.8m. 소방청 진입곤란 기준선(3m = 차폭 + 0.5m)보다 보수적으로 잡은 값.
+//    차종별로 달리할 근거가 생기면 행마다 교체.
+export const CLEARANCE_SOURCE = '명대신문 「화재 안전 사각지대」(2018-10-01) · 현직 소방관 "최소 3.25m"'
+export const CLEARANCE_SOURCE_URL = 'https://news.mju.ac.kr/news/articleView.html?idxno=4325'
 export const VEHICLES = [
-  { id: 'ambulance', name: '구급차', widthM: 2.0, clearanceM: 0.3, lengthM: 5.7, verified: false },
-  { id: 'pump-xs', name: '경형펌프차', widthM: 1.9, clearanceM: 0.3, lengthM: 5.2, heightM: 2.8, verified: true },
-  { id: 'pump-s', name: '소형펌프차', widthM: 2.2, clearanceM: 0.4, lengthM: 6.8, heightM: 2.8, verified: true },
-  { id: 'pump-m', name: '중형펌프차', widthM: 2.5, clearanceM: 0.5, lengthM: 8.0, heightM: 3.2, verified: true, note: '차폭 2.5m는 소방청 진입 기준의 기준 차량 폭' },
-  { id: 'pump-l', name: '대형펌프차', widthM: 2.5, clearanceM: 0.5, lengthM: 8.5, heightM: 3.4, verified: true },
-  { id: 'tank', name: '물탱크차', widthM: 2.5, clearanceM: 0.5, lengthM: 8.6, verified: false },
-  { id: 'ladder', name: '고가사다리차', widthM: 2.5, clearanceM: 0.6, lengthM: 12.0, verified: false },
+  { id: 'ambulance', name: '구급차', widthM: 2.0, clearanceM: 0.8, lengthM: 5.7, verified: false },
+  { id: 'pump-xs', name: '경형펌프차', widthM: 1.9, clearanceM: 0.8, lengthM: 5.2, heightM: 2.8, verified: true },
+  { id: 'pump-s', name: '소형펌프차', widthM: 2.2, clearanceM: 0.8, lengthM: 6.8, heightM: 2.8, verified: true },
+  { id: 'pump-m', name: '중형펌프차', widthM: 2.5, clearanceM: 0.8, lengthM: 8.0, heightM: 3.2, verified: true, note: '차폭 2.5m는 소방청 진입 기준의 기준 차량 폭' },
+  { id: 'pump-l', name: '대형펌프차', widthM: 2.5, clearanceM: 0.8, lengthM: 8.5, heightM: 3.4, verified: true },
+  { id: 'tank', name: '물탱크차', widthM: 2.5, clearanceM: 0.8, lengthM: 8.6, verified: false },
+  { id: 'ladder', name: '고가사다리차', widthM: 2.5, clearanceM: 0.8, lengthM: 12.0, verified: false },
 ]
 export const DEFAULT_VEHICLE_ID = 'pump-m'
 

@@ -4,17 +4,20 @@
 import { writeFileSync } from 'node:fs'
 import { getRoutes } from '../src/lib/directions.js'
 import { detourWaypoint, pointAtDistance, minDistanceToPath } from '../src/lib/geo.js'
-import { dispatch, obstacles } from '../src/data/scenario.js'
+import { dispatch, obstacles, AVOID_MIN_M } from '../src/data/scenario.js'
 
 const BASE = 'http://localhost:5173'
 const AVOID_ID = 'o2' // 우회 경로가 피해야 하는 구간
-const AVOID_MIN_M = 40 // 우회 경로가 막힌 지점에서 최소 이만큼 떨어져야 "피했다"로 인정
 const OFFSETS_M = [130, -130, 200, -200, 300, -300]
 
 // 교통 세그먼트(segments)는 캡처 시점 스냅샷이라 싣지 않는다.
 const slim = (r) => ({ path: r.path, guides: r.guides, distanceM: r.distanceM, durationSec: r.durationSec })
 
-const primary = (await getRoutes(dispatch.currentPos, dispatch.destination, [], BASE))[0]
+const primary = (
+  await getRoutes(dispatch.currentPos, dispatch.destination, [], BASE).catch((e) => {
+    throw new Error(`${BASE} 호출 실패(${e.message}) — dev 서버(npm run dev)가 이 포트에 떠 있는지 확인`)
+  })
+)[0]
 const segmentPos = Object.fromEntries(obstacles.map((o) => [o.id, pointAtDistance(primary.path, o.distanceM)]))
 const avoid = obstacles.find((o) => o.id === AVOID_ID)
 

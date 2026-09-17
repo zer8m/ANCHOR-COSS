@@ -29,12 +29,14 @@ export default function NaviView({ onExit }) {
   const [loading] = useKakaoLoader({ appkey: KAKAO_KEY ?? '', url: 'https://dapi.kakao.com/v2/maps/sdk.js' })
   const [vehicleId, setVehicleId] = useState(DEFAULT_VEHICLE_ID)
   const [panelOpen, setPanelOpen] = useState(false)
-  const [travelled, setTravelled] = useState(0) // 경로 위 이동 거리(m)
+  // 경로 위 이동 거리(m). 어느 경로의 진행값인지 함께 들고 있어, 경로가 바뀐 첫 렌더에서 옛 값이 새 경로에 대입되지 않는다.
+  const [progress, setProgress] = useState({ route: null, m: 0 })
 
   const vehicle = VEHICLES.find((v) => v.id === vehicleId)
   // 출동 차종이 정해지면 센터가 판정 + 경로를 한 번에 내려준다(지령 시점 1회 push).
   const push = useMemo(() => buildPush(vehicle, obstacles, pushedRoutes), [vehicle])
   const route = push.route
+  const travelled = progress.route === route ? progress.m : 0
   const path = route.path
   const guides = route.guides
   const blockedCount = push.segments.filter((s) => !s.passable).length
@@ -71,7 +73,7 @@ export default function NaviView({ onExit }) {
     let raf
     const step = (now) => {
       const t = Math.min(1, (now - start) / dur)
-      setTravelled(total * t)
+      setProgress({ route, m: total * t })
       if (t < 1) raf = requestAnimationFrame(step)
     }
     raf = requestAnimationFrame(step)

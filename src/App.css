@@ -2615,7 +2615,7 @@
 .tnavi-comm-lines .cl-txt {
   font-weight: 600;
 }
-/* CCTV 감지 경고 배너 (상단 중앙) */
+/* 센터 판정 배너 (상단 중앙) */
 .tnavi-warning {
   position: absolute;
   top: 20px;
@@ -2897,9 +2897,6 @@
 }
 
 @media (max-width: 900px) {
-  .tnavi-cctv {
-    width: 300px;
-  }
   .tnavi-turncard {
     min-width: 240px;
   }

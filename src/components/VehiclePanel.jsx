@@ -3,7 +3,7 @@ import { VEHICLES, ENTRY_CRITERIA, CRITERIA_SOURCE, CLEARANCE_M, requiredWidthM 
 // 진입 기준 + 차종별 제원 표. 행을 고르면 출동 차종이 바뀌고 센터 판정이 다시 계산된다.
 export default function VehiclePanel({ vehicleId, onSelect, onClose }) {
   return (
-    <div className="tnavi-vpanel" role="dialog" aria-label="진입 기준 · 차종별 제원">
+    <div className="tnavi-vpanel" aria-label="진입 기준 · 차종별 제원">
       <div className="tnavi-vpanel-head">
         <b>진입 기준 · 차종별 제원</b>
         <button className="tnavi-vpanel-close" onClick={onClose} aria-label="닫기">✕</button>

@@ -68,6 +68,8 @@ export const routes = {
 
 // CCTV 판정 구간. effectiveWidthM = 주차 차량을 뺀 잔여 통과 폭(m).
 // 통과 여부는 데이터에 두지 않는다 — 차종별 필요 통과폭과 대조해 센터(center.js)가 판정.
+// 우회 경로가 막힌 지점에서 최소 이만큼(m) 떨어져야 "피했다"로 인정. 캡처 스크립트와 fixture 테스트가 공유.
+export const AVOID_MIN_M = 40
 export const obstacles = [
   {
     id: 'o1',

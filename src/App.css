@@ -2618,7 +2618,7 @@
 /* CCTV 감지 경고 배너 (상단 중앙) */
 .tnavi-warning {
   position: absolute;
-  top: 88px;
+  top: 20px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 6;
@@ -2654,35 +2654,6 @@
   opacity: 0.95;
 }
 
-/* 교통상태 범례 (상단 중앙) */
-.tnavi-legend {
-  position: absolute;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 4;
-  display: flex;
-  gap: 14px;
-  align-items: center;
-  background: #fff;
-  border: 1px solid #eceef1;
-  border-radius: 999px;
-  padding: 10px 20px;
-  box-shadow: 0 12px 30px rgba(20, 30, 50, 0.14);
-  font-size: 16px;
-  font-weight: 600;
-  color: #5b6672;
-}
-.tnavi-legend span {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.tnavi-legend i {
-  width: 15px;
-  height: 15px;
-  border-radius: 3px;
-}
 /* 경로 계산 중 칩 (지도뷰) */
 .tnavi-loadchip {
   position: absolute;
@@ -2766,79 +2737,122 @@
   color: #5b6672;
 }
 
-/* CCTV 통과상태 (라이트) */
-.tnavi-cctv {
+/* 출동 차종 칩 + 진입 기준·제원 패널 (라이트) */
+.tnavi-vchip {
   position: absolute;
   top: 20px;
   right: 20px;
   z-index: 3;
-  width: 380px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  background: #fff;
+  border: 1px solid #eceef1;
+  border-radius: 999px;
+  padding: 13px 22px;
+  box-shadow: 0 12px 30px rgba(20, 30, 50, 0.14);
+  color: #1c2026;
+  font-size: 18px;
+  cursor: pointer;
+}
+.tnavi-vchip span {
+  font-size: 15px;
+  color: #6b7480;
+  font-variant-numeric: tabular-nums;
+}
+.tnavi-vpanel {
+  position: absolute;
+  top: 80px;
+  right: 20px;
+  z-index: 7;
+  width: 480px;
+  max-width: calc(100vw - 40px);
+  max-height: calc(100vh - 110px);
+  overflow-y: auto;
   background: #fff;
   border: 1px solid #eceef1;
   border-radius: 16px;
   padding: 18px 20px;
   box-shadow: 0 12px 30px rgba(20, 30, 50, 0.14);
+  color: #1c2026;
 }
-.tnavi-cctv-head {
+.tnavi-vpanel-head {
   display: flex;
   justify-content: space-between;
   align-items: center;
   font-size: 18px;
-  font-weight: 700;
   margin-bottom: 12px;
-  color: #1c2026;
 }
-.tnavi-cctv-head span {
-  color: #e5352b;
-  font-size: 15px;
-}
-.tnavi-cctv-item {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: #f5f6f8;
-  border: 1px solid transparent;
-  border-left: 4px solid #b9bfc7;
-  border-radius: 10px;
-  padding: 12px 14px;
-  margin-bottom: 8px;
-  color: #1c2026;
-  cursor: pointer;
-}
-.tnavi-cctv-item.block {
-  border-left-color: #e5352b;
-  background: rgba(229, 53, 43, 0.07);
-}
-.tnavi-cctv-item .num {
-  font-weight: 700;
+.tnavi-vpanel-close {
+  border: 0;
+  background: none;
   font-size: 18px;
-  min-width: 58px;
+  color: #6b7480;
+  cursor: pointer;
+  padding: 4px 8px;
 }
-.tnavi-cctv-info {
-  flex: 1;
+.tnavi-vtable {
+  width: 100%;
+  border-collapse: collapse;
   font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+.tnavi-vtable th,
+.tnavi-vtable td {
+  padding: 10px 8px;
+  text-align: right;
+  border-bottom: 1px solid #eceef1;
+}
+.tnavi-vtable thead th {
+  font-size: 13px;
+  font-weight: 600;
   color: #6b7480;
 }
-.tnavi-cctv-badge {
-  font-size: 15px;
+.tnavi-vtable th:first-child {
+  text-align: left;
+}
+.tnavi-vtable tbody th button {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
   font-weight: 700;
-  padding: 4px 12px;
-  border-radius: 999px;
+  color: inherit;
+  cursor: pointer;
 }
-.tnavi-cctv-badge.pass {
-  background: #eef0f3;
-  color: #5b6672;
+.tnavi-vtable tbody th small {
+  font-weight: 500;
+  color: #9aa3ad;
 }
-.tnavi-cctv-badge.block {
-  background: #e5352b;
-  color: #fff;
+.tnavi-vtable tr.on {
+  background: rgba(229, 53, 43, 0.07);
+  box-shadow: inset 4px 0 0 #e5352b;
 }
-.tnavi-cctv-reroute {
-  margin-top: 6px;
-  font-size: 16px;
+.tnavi-vchip:focus-visible,
+.tnavi-vpanel button:focus-visible {
+  outline: 2px solid #2f6fed;
+  outline-offset: 2px;
+}
+.tnavi-vnote {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: #6b7480;
+}
+.tnavi-vcriteria {
+  margin: 16px 0 0;
+  display: grid;
+  gap: 10px;
+}
+.tnavi-vcriteria dt {
+  font-size: 14px;
   font-weight: 700;
   color: #e5352b;
+}
+.tnavi-vcriteria dd {
+  margin: 2px 0 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #3a424c;
 }
 
 /* 하단 ETA (라이트) */

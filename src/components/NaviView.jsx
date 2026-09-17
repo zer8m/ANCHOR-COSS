@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useKakaoLoader, Map, Polyline, CustomOverlayMap } from 'react-kakao-maps-sdk'
-import { dispatch, obstacles, controlLog } from '../data/scenario.js'
+import { dispatch, obstacles } from '../data/scenario.js'
 import { getRoutes } from '../lib/directions.js'
 import { blockAhead } from '../lib/reroute.js'
-import CctvPanel from './CctvPanel.jsx'
 import ObstacleCam from './ObstacleCam.jsx'
 
 const KAKAO_KEY = import.meta.env.VITE_KAKAO_MAP_KEY
@@ -91,9 +90,6 @@ export default function NaviView({ onExit }) {
   const [warning, setWarning] = useState(null) // CCTV 감지 경고 메시지
   const [travelled, setTravelled] = useState(0) // 경로 위 이동 거리(m)
   const [status, setStatus] = useState(initStatus)
-  const [selectedId, setSelectedId] = useState(null)
-  const [comm, setComm] = useState(true) // 진입 시 관제실 자동 연결 → 무전 기록 바로 표시
-  const [commMsgs, setCommMsgs] = useState([]) // 흘러나온 무전 기록(최신순, 실시간 timestamp)
 
   useEffect(() => {
     let alive = true
@@ -107,18 +103,6 @@ export default function NaviView({ onExit }) {
       alive = false
     }
   }, [])
-
-
-  // 관제실 연결 시 무전 기록을 순차적으로 흘려보냄(최신 항목이 맨 위, 실시간 시각).
-  useEffect(() => {
-    if (!comm || commMsgs.length >= controlLog.length) return
-    const id = setTimeout(() => {
-      const next = controlLog[commMsgs.length]
-      const t = new Date().toLocaleTimeString('ko-KR', { hour12: false })
-      setCommMsgs((prev) => [{ ...next, t }, ...prev])
-    }, commMsgs.length === 0 ? 300 : 2200)
-    return () => clearTimeout(id)
-  }, [comm, commMsgs])
 
   const onStatus = (id, s) => setStatus((prev) => ({ ...prev, [id]: s }))
   const path = route?.path ?? []
@@ -235,8 +219,6 @@ export default function NaviView({ onExit }) {
     const passable = o.passable ? (useLive ? s.passable : true) : false
     return { ...o, passable, count, effWidth, live: useLive }
   })
-  const anyBlocked = liveObstacles.some((o) => !o.passable)
-  const selected = obstacles.find((o) => o.id === selectedId) ?? null
 
   const ready = route && path.length
   const dist = Math.min(travelled, total) // 현재까지 이동 거리(m)
@@ -370,32 +352,6 @@ export default function NaviView({ onExit }) {
         <div className="tnavi-limit">{SPEED_LIMIT}</div>
       </div>
 
-      {/* CCTV 구간 통과상태 (우상단) */}
-      <div className="tnavi-cctv">
-        <div className="tnavi-cctv-head">
-          구간 통과상태 <span>● CCTV 실시간</span>
-        </div>
-        {liveObstacles
-          .slice()
-          .sort((a, b) => a.distanceM - b.distanceM)
-          .map((o) => (
-            <button
-              key={o.id}
-              className={`tnavi-cctv-item ${o.passable ? '' : 'block'}`}
-              onClick={() => setSelectedId(o.id)}
-            >
-              <span className="num">{o.distanceM}m</span>
-              <span className="tnavi-cctv-info">장애물 {o.count}개 · 유효폭 {o.effWidth}m</span>
-              <span className={`tnavi-cctv-badge ${o.passable ? 'pass' : 'block'}`}>{o.passable ? '통과' : '막힘'}</span>
-            </button>
-          ))}
-        {rerouted ? (
-          <div className="tnavi-cctv-reroute">↩ 통과 불가 · 우회 경로로 안내 중</div>
-        ) : anyBlocked ? (
-          <div className="tnavi-cctv-reroute">⚠ 전방 통과 불가 · 우회 경로 대기</div>
-        ) : null}
-      </div>
-
       {/* ETA (좌하단) */}
       <div className="tnavi-eta">
         <div><b>{`${arrival.getHours()}:${pad2(arrival.getMinutes())}`}</b><span>도착</span></div>
@@ -403,33 +359,10 @@ export default function NaviView({ onExit }) {
         <div><b>{(remainM / 1000).toFixed(1)}</b><span>km</span></div>
       </div>
 
-      {/* 관제실 연락 + 종료 (우하단) */}
+      {/* 종료 (우하단) */}
       <div className="tnavi-controls">
-        <div className="tnavi-comm">
-          <button className={`tnavi-comm-btn ${comm ? 'on' : ''}`} onClick={() => setComm((v) => !v)}>
-            {comm ? '관제실 연결됨 · 무전 CH.3' : '관제실 연락'}
-          </button>
-          {comm && (
-            <div className="tnavi-comm-log">
-              <div className="tnavi-comm-status">
-                <span className="tnavi-comm-dot" /> 무전 채널 개방 · 상황실과 통신 중
-              </div>
-              <ul className="tnavi-comm-lines">
-                {commMsgs.map((m, i) => (
-                  <li key={commMsgs.length - i} className={m.who === '상황실' ? 'from-ops' : 'from-crew'}>
-                    <span className="cl-t">{m.t}</span>
-                    <span className="cl-who">{m.who}</span>
-                    <span className="cl-txt">{m.text}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
         <button className="tnavi-exit" onClick={onExit}>종료</button>
       </div>
-
-      {selected && <CctvPanel obstacle={selected} onClose={() => setSelectedId(null)} />}
     </div>
   )
 }

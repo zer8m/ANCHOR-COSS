@@ -105,3 +105,23 @@ scripts/capture-routes.mjs  경로 fixture 캡처
 - 영상 분석(차량 검출, 기준물 기반 잔여 폭 환산)과 실제 관제망 연동은 이 저장소에 없다. 잔여 폭은 시나리오의 고정값이다.
 - 우회 경로는 도로망에서 구간을 제외해 재산출한 것이 아니라 경유지 기반 근사다.
 - 길찾기 프록시는 Vite dev 서버에만 있다. 정적 빌드는 fixture만으로 동작하지만, fixture 재캡처는 dev 환경에서만 된다.
+
+## 관제센터 분석 (Python) — 잔여 폭 추정
+
+CCTV 영상에서 불법주정차 옆 잔여 폭(m)을 추정하는 관제센터 쪽 코드. 단말(웹)과 별개로 돌린다.
+
+```
+common/    BISA 데이터 로더, 소방 진입 기준·차종별 차폭(apparatus.py)
+scale/     픽셀→미터 스케일(소실점 보정), 단면 잔여 폭 측정, T03 격자 검증
+eval/      전 클립 채점 — BISA 납품 tools/validate_width.py 를 그대로 사용
+data/      BISA_납품_* 폴더를 여기에 둔다 (git 제외)
+```
+
+```bash
+pip install -r requirements.txt
+python -X utf8 -m eval.run --source gt --scale all   # 기준선·소실점·bbox 자기보정 비교
+python -X utf8 -m scale.grid_check         # T03 마커 격자 거리별 검증
+python -X utf8 -m common.apparatus         # 차종별 필요 통과폭 표
+```
+
+규칙: 정답 폭·월드 좌표를 예측 입력으로 쓰지 않는다. GT 모드 입력은 footprint px, 도로 경계 px, 차종뿐. 상세는 `scale/README.md`.

@@ -119,7 +119,7 @@ data/      BISA_납품_* 폴더를 여기에 둔다 (git 제외)
 
 ```bash
 pip install -r requirements.txt
-python -X utf8 -m eval.run --source gt     # 기준선 vs 소실점 보정 전후 비교
+python -X utf8 -m eval.run --source gt --scale all   # 기준선·소실점·bbox 자기보정 비교
 python -X utf8 -m scale.grid_check         # T03 마커 격자 거리별 검증
 python -X utf8 -m common.apparatus         # 차종별 필요 통과폭 표
 ```

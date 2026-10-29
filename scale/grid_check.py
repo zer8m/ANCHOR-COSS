@@ -15,7 +15,8 @@ from itertools import combinations
 
 import numpy as np
 
-from common.bisa import clip_ids, data_root, load_gt, load_json, vehicle_widths
+from common.bisa import clip_ids, data_root, load_det, load_gt, load_json, vehicle_widths
+from scale.bbox_calib import calibrate, collect_boxes
 from scale.vanishing import VPScale, _intersect_lines, estimate_naive_scale, estimate_scale
 
 CAM_CLIP = 'S10'  # T03과 카메라 위치가 5 cm 이내로 같은 클립(모든 S 클립이 사실상 같은 설치 위치)
@@ -79,10 +80,16 @@ def main():
     pooled = [{'type': v['type'], 'footprint_px': v['footprint_px']}
               for g in gts if abs(g['camera']['pitch_deg'] - t03_pitch) < 1
               for f in g['frames'] for v in f['vehicles']]
+    same_cam = [g for g in gts if abs(g['camera']['pitch_deg'] - t03_pitch) < 1]
+    boxes = [b for g in same_cam for b in collect_boxes(load_det(g['clip_id']))]
+    cam = same_cam[0]['camera']
+    intr = {k: cam[k] for k in ('width_px', 'height_px', 'hfov_deg')}
     scales = {
         f'transfer({CAM_CLIP})': estimate_scale(obs, widths),
         'transfer(전 클립)': estimate_scale(pooled, widths),
         f'naive({CAM_CLIP})': estimate_naive_scale(obs, widths),
+        'bbox 자기보정': calibrate(boxes, intr)[0].vp_scale(),
+        'bbox+설치높이': calibrate(boxes, intr, h_known=cam['height_from_road_m'])[0].vp_scale(),
         'grid(20m로 k)': grid_scale(rows),
     }
     res = {n: pair_errors(s, rows) for n, s in scales.items()}

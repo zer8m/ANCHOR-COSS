@@ -23,3 +23,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Python (관제센터 분석)
+data/
+outputs/
+__pycache__/
+.venv/

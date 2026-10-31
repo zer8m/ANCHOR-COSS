@@ -17,6 +17,16 @@ from scale.vanishing import VPScale
 CAR = dict(width_m=1.85, length_m=4.7, height_m=1.5)   # 표준 승용차 (vehicles.json 승용 4종 근사)
 ROLL_PRIOR_PX_PER_DEG = 5.0
 
+# 차급 템플릿: 국내 판매 차급의 대표 치수(공개 제원 범위의 가운데 값, 미러 제외). 납품 vehicles.json 값을 베끼지 않는다.
+TEMPLATES = {
+    'sedan':   dict(width_m=1.85, length_m=4.8, height_m=1.45),   # 중형 세단
+    'compact': dict(width_m=1.78, length_m=4.25, height_m=1.55),  # 소형 SUV·해치백
+    'suv':     dict(width_m=1.90, length_m=4.8, height_m=1.70),   # 중형 SUV
+    'van':     dict(width_m=2.00, length_m=5.15, height_m=1.80),  # 미니밴
+    'truck':   dict(width_m=1.75, length_m=5.10, height_m=2.00),  # 1톤 트럭(적재함 포함 높이)
+}
+CLASS_MARGIN_PX = 1.0   # 표준 승용차보다 이만큼(px RMS) 더 잘 맞아야 다른 차급으로 본다(잡음에 흔들리지 않게)
+
 
 def _rot(pitch, yaw, roll):
     """도로 좌표(x 우, y 도로 방향, z 위) → 카메라 광학 좌표(x 우, y 아래, z 앞)."""
@@ -83,17 +93,18 @@ def collect_boxes(det, min_conf=0.85, min_pixels=1500, min_presence=0.3, img=(19
     return [np.median(t, 0) for t in tracks if len(t) >= min_presence * n]
 
 
-def calibrate(boxes, intr, h_known=None, car=CAR):
+def calibrate(boxes, intr, h_known=None, car=CAR, cars=None):
     """bbox 여러 개로 카메라 자세를 맞춘다. 국소해를 피하려고 pitch·높이 초기값 여러 개에서 시작해
-    가장 잘 맞는 해를 고른다. 반환: (Camera, 잔차 px RMS)."""
+    가장 잘 맞는 해를 고른다. cars 를 주면 박스마다 그 치수를 쓴다(차급 분류 결과). 반환: (Camera, 잔차 px RMS)."""
     boxes = [np.asarray(b, float) for b in boxes]
     if not boxes:
         raise ValueError('보정에 쓸 차량 bbox가 없음')
+    cars = cars or [car] * len(boxes)
     best = None
     for pitch0 in (5, 15, 25, 35):
         for h0 in ([h_known] if h_known else (2.5, 4.0, 7.0)):
             try:
-                cam, rms = _calibrate_from(boxes, intr, h_known, car, np.radians(pitch0), h0)
+                cam, rms = _calibrate_from(boxes, intr, h_known, cars, np.radians(pitch0), h0)
             except ValueError:  # 이 초기 자세로는 박스 바닥이 지평선 위 — 불가능한 시작점
                 continue
             if best is None or rms < best[1]:
@@ -101,7 +112,7 @@ def calibrate(boxes, intr, h_known=None, car=CAR):
     return best
 
 
-def _calibrate_from(boxes, intr, h_known, car, pitch0, h0, iters=40):
+def _calibrate_from(boxes, intr, h_known, cars, pitch0, h0, iters=40):
     g0 = [pitch0, 0.0, 0.0] + ([] if h_known else [h0])
 
     def unpack(p):
@@ -114,7 +125,7 @@ def _calibrate_from(boxes, intr, h_known, car, pitch0, h0, iters=40):
     cam0, _ = unpack(np.r_[g0, np.zeros(2 * len(boxes))])
     s0 = cam0.vp_scale()
     xy = []
-    for b in boxes:
+    for b, car in zip(boxes, cars):
         X, D = s0.to_ground([[(b[0] + b[2]) / 2, b[3]]])
         Yref = s0.to_ground(cam0.project([[0, 20, 0]]))[1][0]
         xy += [X[0], 20 * D[0] / Yref + car['length_m'] / 2]
@@ -124,7 +135,7 @@ def _calibrate_from(boxes, intr, h_known, car, pitch0, h0, iters=40):
         cam, pos = unpack(p)
         if cam.h <= 0.5:
             return np.full(4 * len(boxes) + 1, 1e3)
-        r = [_box_bbox(cam, X, Y, car) - b for (X, Y), b in zip(pos, boxes)]
+        r = [_box_bbox(cam, X, Y, car) - b for (X, Y), b, car in zip(pos, boxes, cars)]
         # roll ≈ 0 약한 사전조건(1°당 5 px). 박스가 1~2개뿐이면 미지수가 식보다 많아 이게 없으면 해가 흔들린다.
         # 박스가 충분하면 끈다 — 실제 roll(0.45°)을 0으로 끌어당겨 오히려 나빠진다
         wr = ROLL_PRIOR_PX_PER_DEG if len(boxes) < 3 else 0.0
@@ -149,6 +160,71 @@ def _calibrate_from(boxes, intr, h_known, car, pitch0, h0, iters=40):
             lam *= 5
     cam, _ = unpack(p)
     return cam, float(np.sqrt(np.mean(resid(p)[:-1] ** 2)))
+
+
+def fit_box(cam, bbox, car, comps=(0, 1, 2, 3), iters=20):
+    """카메라가 정해졌을 때 bbox 의 comps 변(0 좌, 1 위, 2 우, 3 아래)에 car 치수 박스를 맞춘 지면 위치.
+    반환: (X, Y, comps 변 오차 RMS px) 또는 None(아래 변이 지평선 위)."""
+    bbox, idx = np.asarray(bbox, float), list(comps)
+    s = cam.vp_scale()
+    try:
+        X, D = s.to_ground([[(bbox[0] + bbox[2]) / 2, bbox[3]]])
+    except ValueError:
+        return None
+    Yref = s.to_ground(cam.project([[0, 20, 0]]))[1][0]
+    p, lam = np.array([X[0], 20 * D[0] / Yref + car['length_m'] / 2]), 1e-2
+
+    def r_of(q):
+        return (_box_bbox(cam, q[0], q[1], car) - bbox)[idx]
+
+    r = r_of(p)
+    for _ in range(iters):
+        J = np.empty((len(idx), 2))
+        for i in range(2):
+            e = np.zeros(2); e[i] = 1e-3
+            J[:, i] = (r_of(p + e) - r) / 1e-3
+        step = np.linalg.solve(J.T @ J + lam * np.eye(2), -J.T @ r)
+        r_new = r_of(p + step)
+        if r_new @ r_new < r @ r:
+            p, r, lam = p + step, r_new, lam / 3
+            if np.abs(step).max() < 1e-4:
+                break
+        else:
+            lam *= 5
+    return float(p[0]), float(p[1]), float(np.sqrt(np.mean(r ** 2)))
+
+
+def classify_box(cam, bbox, templates=TEMPLATES, margin_px=CLASS_MARGIN_PX):
+    """bbox 에 차급 템플릿을 하나씩 맞춰 가장 잘 맞는 차급을 고른다.
+    설치 높이가 맞아야(미터 단위가 정해져야) 크기를 가를 수 있다. 반환: (차급, X, Y, RMS px)."""
+    fits = {}
+    for name, car in templates.items():
+        f = fit_box(cam, bbox, car)
+        if f is not None:
+            fits[name] = f
+    if not fits:
+        return None
+    best = min(fits, key=lambda n: fits[n][2])
+    if 'sedan' in fits and fits[best][2] > fits['sedan'][2] - margin_px:
+        best = 'sedan'
+    return (best, *fits[best])
+
+
+def calibrate_sized(boxes, intr, h_known=None, rounds=2):
+    """차급 분류를 넣은 보정: 표준 승용차로 보정 → 박스마다 차급 분류 → 그 치수로 다시 보정(rounds 회).
+    반환: (Camera, RMS, 박스별 차급)."""
+    cam, rms = calibrate(boxes, intr, h_known)
+    names = ['sedan'] * len(boxes)
+    for _ in range(rounds):
+        new = []
+        for b in boxes:
+            c = classify_box(cam, b)
+            new.append(c[0] if c else 'sedan')
+        if new == names:
+            break
+        names = new
+        cam, rms = calibrate(boxes, intr, h_known, cars=[TEMPLATES[n] for n in names])
+    return cam, rms, names
 
 
 def estimate_scale_from_bbox(dets, intr, h_known=None):

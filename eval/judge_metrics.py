@@ -22,12 +22,18 @@ import numpy as np
 from common.apparatus import APPARATUS, required_width_m
 from common.bisa import clip_ids, load_det, load_gt, validator
 from judge import MARGIN_M, decide, margin_m
-from judge.handoff import DET_COLLAPSE, OCCLUSION, OCCUPANCY_REASONS, OUT_OF_RANGE, HandoffMonitor, frame_reasons, section_geometry
+from judge.handoff import (DET_COLLAPSE, OCCLUSION, OCCUPANCY_REASONS, SCALE_FALLBACK, UNCONDITIONAL_REASONS, HandoffMonitor,
+                           frame_reasons, section_geometry)
 from scale import measure_section
 
 from .run import bbox_scale, predict_det, predict_gt
 
 SWEEP_CM = list(range(0, 21))
+
+
+def passable_mask(res, margin, need):
+    """judge.decide 와 같은 mm 반올림 비교(벡터판)."""
+    return np.round(res - margin, 3) >= round(need, 3)
 
 
 def collect(scale_name, clips, source='gt', occ=2, memory=None):
@@ -38,6 +44,7 @@ def collect(scale_name, clips, source='gt', occ=2, memory=None):
         gt, det = load_gt(c), load_det(c)
         pred, scale = predict_gt(gt, scale_name) if source == 'gt' else (predict_det(gt, det, scale_name, occ) if memory is None else predict_det(gt, det, scale_name, occ, memory))
         det_scale = bbox_scale(gt, use_height=True)
+        fallback = str(scale.source).startswith('camera')   # 카메라 설치 정보로 대체한 스케일 → SCALE_FALLBACK (pipeline 이 넘기는 사유)
         res = {(p['frame'], p['section_id']): p['residual_width_m'] for p in pred['predictions']}
         dframes = {f['frame']: f['detections'] for f in det['frames']}
         geoms = {s['section_id']: section_geometry(det_scale, gt['camera'], s['left_edge']['px'], s['right_edge']['px'])
@@ -48,6 +55,8 @@ def collect(scale_name, clips, source='gt', occ=2, memory=None):
             for s in f['sections']:
                 sid = s['section_id']
                 reasons = mons[sid].update(frame_reasons(dframes.get(f['frame'], []), geoms[sid], det_scale))
+                if fallback:
+                    reasons = set(reasons) | {SCALE_FALLBACK}
                 clip_rows.append(dict(clip=c, frame=f['frame'], section=sid, residual=res[(f['frame'], sid)],
                                       truth=s['residual_width_m'], reasons=reasons, dist_m=geoms[sid]['dist_m'],
                                       _f=f, _s=s))
@@ -72,12 +81,12 @@ def arrays(rows, key='residual'):
     return dict(
         res=a(lambda r: r[key] if r[key] is not None else np.nan), truth=a(lambda r: r['truth']),
         occ=a(lambda r: any(x in OCCUPANCY_REASONS for x in r['reasons'])),
-        oor=a(lambda r: OUT_OF_RANGE in r['reasons']))
+        oor=a(lambda r: any(x in UNCONDITIONAL_REASONS for x in r['reasons'])))
 
 
 def counts(A, need, margin):
     """판정 로직(judge.decide 와 같은 식)의 벡터판. 반환: 위험 통과, 불필요 우회, 이관, 전체."""
-    passable = A['res'] - margin >= need
+    passable = passable_mask(A['res'], margin, need)
     handoff = A['oor'] | (passable & A['occ'])
     ok = A['truth'] >= need
     return (int((passable & ~handoff & ~ok).sum()), int((~passable & ~handoff & ok).sum()),
@@ -102,7 +111,7 @@ def check_against_decide_and_validator(rows, A, scale_name, margin):
         unsafe_val = 0
         for c in sorted({r['clip'] for r in rows}):
             kept = [r for r in rows if r['clip'] == c and decide(r['residual'], ap.id, margin, r['reasons']).result != '관제이관']
-            preds = [dict(frame=r['frame'], section_id=r['section'], residual_width_m=max(r['residual'] - margin, 0.0)) for r in kept]
+            preds = [dict(frame=r['frame'], section_id=r['section'], residual_width_m=round(max(r['residual'] - margin, 0.0), 3)) for r in kept]
             out = v.evaluate(load_gt(c), {'clip_id': c, 'predictions': preds}, required_width_m=need)
             unsafe_val += out['unsafe_false_pass_count']
         assert unsafe_vec == unsafe_dec == unsafe_val, (scale_name, ap.id, unsafe_vec, unsafe_dec, unsafe_val)
@@ -185,9 +194,9 @@ def stress_report(scale_name, rows):
         cand = leak = n = 0
         for r in stress_rows:
             n += 1
-            if r['stress'] - margin >= need and r['truth'] < need:
+            if passable_mask(r['stress'], margin, need) and r['truth'] < need:
                 cand += 1
-                if any(x in OCCUPANCY_REASONS for x in r['reasons']) or OUT_OF_RANGE in r['reasons']:
+                if any(x in OCCUPANCY_REASONS for x in r['reasons']) or any(x in UNCONDITIONAL_REASONS for x in r['reasons']):
                     continue
                 leak += 1
                 leaks[ap.id].append((r['clip'], r['frame'], r['section']))
@@ -221,7 +230,7 @@ def compare(clips):
             return cells + ' - | - | - | - |', None
         t = [counts(A, required_width_m(a.id), margin) for a in APPARATUS]
         need = required_width_m('pump-m')
-        mask = A['oor'] | ((A['res'] - margin >= need) & A['occ'])
+        mask = A['oor'] | (passable_mask(A['res'], margin, need) & A['occ'])
         ho = sorted({r['clip'] for r, h in zip(rows, mask) if h})
         return cells + f' {margin*100:.0f} | {sum(x[0] for x in t)} | {sum(x[1] for x in t)} | {int(mask.sum())} ({", ".join(ho)}) |', A
 

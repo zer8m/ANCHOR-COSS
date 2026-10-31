@@ -19,6 +19,10 @@ DET_COLLAPSE = 'det_collapse'
 OCCLUSION = 'occlusion_suspect'
 OUT_OF_RANGE = 'out_of_range'
 ALL_REASONS = (DET_COLLAPSE, OCCLUSION, OUT_OF_RANGE)
+# 카메라 설치 정보로 대체한 스케일(검출·footprint 가 없어 보정 못 함) 등 스케일을 못 믿는 경우. frame_reasons 가 내지 않고
+# pipeline 이 스케일 출처를 보고 직접 넘긴다. out_of_range 처럼 결과와 무관하게 이관한다.
+SCALE_FALLBACK = 'scale_fallback'
+UNCONDITIONAL_REASONS = (OUT_OF_RANGE, SCALE_FALLBACK)  # decide 가 통과/불가와 무관하게 이관하는 사유
 OCCUPANCY_REASONS = (DET_COLLAPSE, OCCLUSION)  # 점유를 과소평가 → 잔여폭이 실제보다 크게 나옴
 
 # 신뢰도 ≥0.85 인 유효 박스 기준은 scale.bbox_calib.collect_boxes 와 같다

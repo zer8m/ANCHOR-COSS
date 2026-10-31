@@ -124,4 +124,21 @@ python -X utf8 -m scale.grid_check         # T03 마커 격자 거리별 검증
 python -X utf8 -m common.apparatus         # 차종별 필요 통과폭 표
 ```
 
+### pipeline — 추정 결과 → 단말 push
+
+```
+pipeline/cameras.json    CCTV 클립 id → 단말 판정 구간 id (지금은 S21 → o1)
+pipeline/summarize.py    outputs/gt/{clip}_vp.json → 구간 잔여 폭 하나 (최근 15프레임 최솟값), 믿기 어려운 클립 표시
+pipeline/judge_stub.py   judge/ 가 생기기 전 임시 판정. 반환 { status: pass|block|handoff, required_m, margin_m }
+pipeline/build_push.py   차종별 public/push/{id}.json 생성 (center.js buildPush 와 같은 모양, passable 대신 status)
+```
+
+```bash
+python -X utf8 -m eval.run --source gt --scale vp   # outputs/gt/ 생성 (선행)
+python -X utf8 -m pipeline.build_push               # public/push/*.json
+python -X utf8 -m pipeline.test_pipeline
+```
+
+`judge/` 패키지가 들어오면 `build_push.py`가 자동으로 그쪽 `judge()`를 쓴다(import 폴백). `handoff`는 경계 구간·불신 클립을 관제요원 확인으로 넘기는 상태로, 단말은 노란 "판정 보류" 마커로 표시할 예정.
+
 규칙: 정답 폭·월드 좌표를 예측 입력으로 쓰지 않는다. GT 모드 입력은 footprint px, 도로 경계 px, 차종뿐. 상세는 `scale/README.md`.

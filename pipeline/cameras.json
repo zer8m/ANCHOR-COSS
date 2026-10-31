@@ -1,0 +1,4 @@
+{
+  "_comment": "CCTV(납품 클립 id) → 단말 지도의 판정 구간 id. 구간 좌표는 src/data/pushedRoutes.js 의 segmentPos 에서 가져온다.",
+  "S21": { "segment_id": "o1", "name": "창신시장 인근 (창신길)" }
+}

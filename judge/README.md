@@ -15,30 +15,6 @@
 
 20 cm 는 det 모드에서만 적용한다(점유·경계 오차까지 더해지는 운용 조건). 근거는 `decide.py` 주석과 아래 한계 참고.
 
-## `judge()` — pipeline 용 한 줄 API
-
-```python
-from judge import judge
-judge(2.9, 'amb-s')               # {'status': 'pass',    'required_m': 2.8, 'margin_m': 0.1}   (footprint_vp, 여유 5 cm)
-judge(2.9, 'amb-s', 'bbox_h')     # {'status': 'handoff', ...}                                  (여유 20 cm)
-judge(2.9, 'pump-m')              # {'status': 'block',   'required_m': 3.3, 'margin_m': -0.4}
-```
-
-| 조건 | status |
-|---|---|
-| 잔여폭 < 필요폭 | `block` (스케일 출처와 무관, block 우선) |
-| 잔여폭 ≥ 필요폭 + 여유 | `pass` |
-| 그 사이(경계 구간) | `handoff` |
-| `scale_source` 가 `'camera'` 이거나 모르는 값 (block 이 아닐 때) | `handoff` |
-
-- `scale_source` 별 여유: `footprint_vp` 5 cm, `bbox_h` 20 cm(det 운용), `bbox` 25 cm (`judge.SCALE_SOURCE_MARGIN_M`).
-- `margin_m` = 잔여폭 − 필요폭 (여유를 뺀 값이 아님). 모르는 `apparatus_id` 는 `ValueError`.
-- `decide()` 와의 차이: `decide()` 는 경계 구간을 `불가` 로 두지만 `judge()` 는 `handoff` 로 낸다. `decide()` 와 eval 은 그대로다.
-- 테스트: `python -X utf8 -m judge.test_judge` (pytest 불필요).
-- **이관 사유 감지·프레임 집계는 pipeline 담당.** `judge()` 는 잔여폭 한 값만 보므로 검출 붕괴·가림·범위 밖을 모른다.
-  det 모드에서 `judge()` 만 쓰면 S32·S36(검출 붕괴)에서 차종당 216건 위험 통과가 난다(이관 사유를 붙이면 0).
-  감지 로직은 `judge.handoff`(`HandoffMonitor`, `frame_reasons`, `section_geometry`)를 쓸 수 있다.
-
 ## 이관 조건 (`python -X utf8 -m judge.handoff` 로 클립별 확정 비율 확인)
 
 | 사유 | 감지 | 38클립 결과 |

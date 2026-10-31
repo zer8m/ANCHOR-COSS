@@ -111,6 +111,11 @@
   to { transform: translate(-50%, 0); opacity: 1; }
 }
 
+.tnavi-warning.handoff {
+  background: linear-gradient(150deg, #f4c430, #d9a80f);
+  color: #1c2026;
+  box-shadow: 0 16px 40px -8px rgba(217, 168, 15, 0.55);
+}
 .tnavi-warning-icon {
   font-size: 32px;
   line-height: 1;
@@ -166,6 +171,10 @@
   background: #e5352b;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35), 0 0 0 6px rgba(229, 53, 43, 0.25);
   animation: obs-blink 1.3s ease-in-out infinite;
+}
+.tnavi-obsmk.handoff {
+  background: #f4c430;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35), 0 0 0 6px rgba(244, 196, 48, 0.3);
 }
 
 /* 턴 카드 (라이트) */

@@ -24,7 +24,8 @@ const arrowFor = (t = '') =>
   t.includes('좌회전') ? '↰' : t.includes('우회전') ? '↱' : t.includes('유턴') ? '⤾' : t.includes('도착') ? '⚑' : '↑'
 
 // 소방 출동 단말 — 센터가 밀어준 판정 결과·경로(push)를 지도 위에 표출만 한다.
-// 검출·판정·경로 계산은 하지 않는다(buildPush = 센터 mock). 계산 과정(유효폭 등)도 띄우지 않는다.
+// 검출·판정·경로 계산은 하지 않는다. 계산 과정(유효폭 등)도 띄우지 않는다.
+// push = public/push/{차종}.json (관제센터 pipeline/build_push.py 산출물). 없으면 단말 내 mock(buildPush) 폴백.
 export default function NaviView({ onExit }) {
   const [loading] = useKakaoLoader({ appkey: KAKAO_KEY ?? '', url: 'https://dapi.kakao.com/v2/maps/sdk.js' })
   const [vehicleId, setVehicleId] = useState(DEFAULT_VEHICLE_ID)
@@ -34,14 +35,29 @@ export default function NaviView({ onExit }) {
 
   const vehicle = VEHICLES.find((v) => v.id === vehicleId)
   // 출동 차종이 정해지면 센터가 판정 + 경로를 한 번에 내려준다(지령 시점 1회 push).
-  const push = useMemo(() => buildPush(vehicle, obstacles, pushedRoutes), [vehicle])
-  const route = push.route
+  const [push, setPush] = useState(null)
+  useEffect(() => {
+    let alive = true
+    setPush(null)
+    fetch(`/push/${vehicleId}.json`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .catch((e) => {
+        console.warn(`센터 push 파일 없음(${e.message}) → 단말 mock 판정으로 폴백`)
+        return buildPush(vehicle, obstacles, pushedRoutes)
+      })
+      .then((p) => alive && setPush(p))
+    return () => {
+      alive = false
+    }
+  }, [vehicleId, vehicle])
+  const route = push?.route ?? null
   const travelled = progress.route === route ? progress.m : 0
-  const path = route.path
-  const guides = route.guides
-  const blockedCount = push.segments.filter((s) => !s.passable).length
+  const path = route?.path ?? []
+  const guides = route?.guides ?? []
+  const count = (status) => push?.segments.filter((s) => s.status === status).length ?? 0
 
   const { guideIdx, cum, total, truckAvgKmh, fireDurationSec } = useMemo(() => {
+    if (!route) return { guideIdx: [], cum: [0], total: 0, truckAvgKmh: 0, fireDurationSec: 0 }
     const p = route.path
     const cum = [0]
     for (let i = 1; i < p.length; i++) cum[i] = cum[i - 1] + haversine(p[i - 1], p[i])
@@ -79,6 +95,14 @@ export default function NaviView({ onExit }) {
     raf = requestAnimationFrame(step)
     return () => cancelAnimationFrame(raf)
   }, [route, total, fireDurationSec])
+
+  if (!push) {
+    return (
+      <div className="tnavi">
+        <div className="tnavi-msg">관제센터 판정 수신 중…</div>
+      </div>
+    )
+  }
 
   const dist = Math.min(travelled, total) // 현재까지 이동 거리(m)
   // dist(m) → 경로 위 현재 지점 보간 + 마지막으로 지난 점 인덱스(idx)
@@ -133,10 +157,10 @@ export default function NaviView({ onExit }) {
             <Polyline path={path} strokeWeight={11} strokeColor="#2f6fed" strokeOpacity={0.9} />
             {/* 이미 지난 구간은 회색으로 덮음 */}
             <Polyline path={path.slice(0, idx + 1)} strokeWeight={11} strokeColor="#b9bfc7" strokeOpacity={0.9} />
-            {/* CCTV 판정 구간 (막힘=빨강) */}
+            {/* CCTV 판정 구간: pass=회색 · block=빨강 · handoff(판정 보류)=노랑 */}
             {push.segments.map((s) => (
               <CustomOverlayMap key={s.id} position={s.pos} yAnchor={0.5} xAnchor={0.5}>
-                <div className={`tnavi-obsmk ${s.passable ? '' : 'block'}`} />
+                <div className={`tnavi-obsmk ${s.status}`} title={s.name} />
               </CustomOverlayMap>
             ))}
             <CustomOverlayMap position={pos} yAnchor={0.5} xAnchor={0.5}>
@@ -147,15 +171,23 @@ export default function NaviView({ onExit }) {
       </div>
 
       {/* 센터 판정 결과 (상단 중앙). 계산 근거는 표시하지 않는다. */}
-      {push.rerouted && (
+      {push.rerouted ? (
         <div className="tnavi-warning" role="status">
           <span className="tnavi-warning-icon">⚠️</span>
           <div className="tnavi-warning-body">
-            <b>진입 불가 구간 {blockedCount}곳</b>
+            <b>진입 불가 구간 {count('block')}곳</b>
             <p>관제센터 판정 · 우회 경로로 안내합니다</p>
           </div>
         </div>
-      )}
+      ) : count('handoff') > 0 ? (
+        <div className="tnavi-warning handoff" role="status">
+          <span className="tnavi-warning-icon">⏳</span>
+          <div className="tnavi-warning-body">
+            <b>판정 보류 구간 {count('handoff')}곳</b>
+            <p>관제요원 확인 중 · 원 경로로 안내, 진입 전 주의</p>
+          </div>
+        </div>
+      ) : null}
 
       {/* 턴 카드 (좌상단) */}
       <div className="tnavi-turncard">

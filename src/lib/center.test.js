@@ -25,7 +25,7 @@ const amb = buildPush(byId('amb-s'), segments, routes)
 assert.equal(amb.rerouted, false)
 assert.equal(amb.route, primary)
 assert.deepEqual(amb.abandonedPath, [])
-assert.deepEqual(amb.segments.map((s) => s.passable), [true, true])
+assert.deepEqual(amb.segments.map((s) => s.status), ['pass', 'pass'])
 
 // 중형펌프차는 막힘 → 우회 경로 + 버려진 원 경로.
 const pump = buildPush(byId('pump-m'), segments, routes)
@@ -33,8 +33,8 @@ assert.equal(pump.rerouted, true)
 assert.equal(pump.route, detour)
 assert.equal(pump.abandonedPath, primary.path)
 assert.deepEqual(pump.segments, [
-  { id: 'a', pos: { lat: 1, lng: 1 }, passable: true },
-  { id: 'b', pos: { lat: 1, lng: 2 }, passable: false },
+  { id: 'a', pos: { lat: 1, lng: 1 }, status: 'pass' },
+  { id: 'b', pos: { lat: 1, lng: 2 }, status: 'block' },
 ])
 assert.equal(pump.requiredWidthM, 3.3)
 assert.equal(pump.vehicleId, 'pump-m')

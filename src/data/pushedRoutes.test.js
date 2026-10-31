@@ -26,7 +26,7 @@ for (const id of routes.detour.avoids) {
 // 어떤 차종이든, 막힌 구간은 전부 우회 경로가 피하는 구간이어야 한다(막힌 곳을 지나는 "우회로" 방지).
 for (const v of VEHICLES) {
   const push = buildPush(v, obstacles, routes)
-  for (const s of push.segments.filter((x) => !x.passable)) {
+  for (const s of push.segments.filter((x) => x.status === 'block')) {
     assert.ok(routes.detour.avoids.includes(s.id), `${v.name}: ${s.id}가 막혔는데 우회 경로가 피하지 않음`)
   }
 }

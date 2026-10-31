@@ -15,19 +15,21 @@
 
 - 관제 영상은 관제센터 밖으로 반출할 수 없다. 그래서 단말은 **표출만** 한다 — 검출·판정·경로 계산을 하지 않고, 주행 화면에 잔여 폭 같은 계산 과정도 띄우지 않는다.
 - 전송은 출동 지령 시점의 **1회 단방향 push**다. 주행 중 경로 전환 로직은 없다.
-- 지금은 `src/lib/center.js`의 `buildPush()`가 센터 역할을 한다(순수 함수). 관제센터 프로그램이 같은 모양의 JSON을 내보내면 이 함수만 교체하면 된다.
+- 센터 push = `public/push/{차종id}.json` (파이썬 `pipeline/build_push.py` 산출물). 단말은 차종을 고르면 이 파일을 fetch해서 그린다. 파일이 없으면 `src/lib/center.js`의 `buildPush()`(단말 내 mock, 같은 모양)로 폴백한다.
 
 ```js
-buildPush(vehicle, segments, routes)
-// → { vehicleId, requiredWidthM, segments: [{ id, pos, passable }], rerouted, route, abandonedPath }
+// public/push/pump-m.json
+{ vehicleId, requiredWidthM, segments: [{ id, name, pos, status: 'pass'|'block'|'handoff', clip_id, reason }],
+  rerouted, route, abandonedPath }
 ```
 
 ## 화면
 
 1. **출동 브리핑** — 신고 내용·위치. "안내 시작"으로 내비 화면 진입.
-2. **내비** — 안내 경로(파랑), 진입 불가로 버려진 원 경로(회색 점선), CCTV 판정 구간 마커(막힘=빨강), 턴 안내·속도·ETA.
+2. **내비** — 안내 경로(파랑), 진입 불가로 버려진 원 경로(회색 점선), CCTV 판정 구간 마커(통과=회색 · 막힘=빨강 · 판정 보류=노랑), 턴 안내·속도·ETA.
+   `handoff`(판정 보류)는 경계 구간이거나 영상을 믿기 어려워 관제요원 확인으로 넘긴 상태 — 원 경로로 안내하되 노란 배너로 주의를 띄운다.
    우상단 **차종 칩**을 누르면 *진입 기준 · 차종별 제원* 패널이 열리고, 차종을 바꾸면 같은 골목의 판정과 경로가 바뀐다
-   (예: 잔여 폭 2.9m 구간 — 구급차·경형펌프차는 직진, 소형펌프차 이상은 우회).
+   (예: 잔여 폭 2.9m 구간 — 구급차(소형)·경형펌프차는 직진, 구급차(중형)는 경계라 판정 보류, 소형펌프차 이상은 우회).
 
 ## 판정 기준
 
@@ -91,9 +93,10 @@ src/
   data/
     scenario.js             출발·목적지·판정 구간(잔여 폭)
     vehicles.js             차종 제원, 여유폭, 진입 기준, 법적 근거
-    pushedRoutes.js         경로 fixture (스크립트 산출물 — 직접 수정 금지)
+    pushedRoutes.js         경로 fixture (스크립트 산출물 — 직접 수정 금지). pipeline이 push JSON에 그대로 싣는다
+public/push/{id}.json       차종별 센터 push (pipeline/build_push.py 산출물 — 직접 수정 금지)
   lib/
-    center.js               mock 관제센터: buildPush()
+    center.js               단말 내 mock 센터 buildPush() — push 파일 없을 때 폴백
     passable.js             폭 대조 판정
     geo.js                  haversine, 경로 투영, 점–경로 거리, 우회 경유지
     directions.js           Kakao 길찾기 호출·파싱 (캡처 스크립트 전용)
@@ -139,6 +142,6 @@ python -X utf8 -m pipeline.build_push               # public/push/*.json
 python -X utf8 -m pipeline.test_pipeline
 ```
 
-`judge/` 패키지가 들어오면 `build_push.py`가 자동으로 그쪽 `judge()`를 쓴다(import 폴백). `handoff`는 경계 구간·불신 클립을 관제요원 확인으로 넘기는 상태로, 단말은 노란 "판정 보류" 마커로 표시할 예정.
+`judge/` 패키지가 들어오면 `build_push.py`가 자동으로 그쪽 `judge()`를 쓴다(import 폴백). `handoff`는 경계 구간·불신 클립을 관제요원 확인으로 넘기는 상태로, 단말이 노란 "판정 보류" 마커·배너로 표시한다.
 
 규칙: 정답 폭·월드 좌표를 예측 입력으로 쓰지 않는다. GT 모드 입력은 footprint px, 도로 경계 px, 차종뿐. 상세는 `scale/README.md`.

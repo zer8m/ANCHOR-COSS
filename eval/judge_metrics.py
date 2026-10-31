@@ -200,15 +200,76 @@ def stress_report(scale_name, rows):
     return leaks
 
 
+def _before(A):
+    """판정 전: 이관 없음(사유 무시)."""
+    return dict(A, occ=np.zeros_like(A['occ']), oor=np.zeros_like(A['oor']))
+
+
+def compare(clips):
+    """PR 본문용 전후 비교표(markdown). 판정 전 = 잔여폭 ≥ 필요폭 만 비교(여유 0, 이관 없음)."""
+    def line(label, rows, margin, scale_name=None):
+        A = arrays(rows)
+        err = A['res'] - A['truth']
+        u0 = sum(counts(_before(A), required_width_m(a.id), 0.0)[0] for a in APPARATUS)
+        d0 = sum(counts(_before(A), required_width_m(a.id), 0.0)[1] for a in APPARATUS)
+        cells = f'| {label} | {np.abs(err).mean()*100:.2f} | {err.max()*100:+.1f} | {u0} | {d0} |'
+        if margin is None:
+            return cells + ' - | - | - | - |', None
+        t = [counts(A, required_width_m(a.id), margin) for a in APPARATUS]
+        need = required_width_m('pump-m')
+        mask = A['oor'] | ((A['res'] - margin >= need) & A['occ'])
+        ho = sorted({r['clip'] for r, h in zip(rows, mask) if h})
+        return cells + f' {margin*100:.0f} | {sum(x[0] for x in t)} | {sum(x[1] for x in t)} | {int(mask.sum())} ({", ".join(ho)}) |', A
+
+    head = ('| 스케일 / 점유 | MAE cm | 최대 과대추정 cm | 판정 전 위험통과 | 판정 전 우회 | 여유 cm | 판정 후 위험통과 | 판정 후 우회 | 이관(pump-m) |\n'
+            '|---|---:|---:|---:|---:|---:|---:|---:|---|')
+    final = {}
+    print('### gt 모드 (점유=GT footprint, 4275 프레임·단면; 위험통과·우회는 9차종 합)')
+    print()
+    print(head)
+    for name in ('naive', 'vp', 'bbox_h'):
+        rows = collect(name, clips, 'gt')
+        text, A = line(name, rows, MARGIN_M.get(name))
+        print(text)
+        if A is not None:
+            final[f'gt {name}'] = (A, MARGIN_M[name])
+    print()
+    print('### det 모드 (bbox_h 스케일, 점유=det bbox; 도로 경계는 설치 측량 가정)')
+    print()
+    print(head)
+    for label, occ, mem in (('det 1단계(아래 변), 기억 없음', 1, 0), ('det 2단계(승용차 맞춤), 기억 없음', 2, 0),
+                            ('det 2단계 + 점유 기억 15프레임', 2, 15)):
+        rows = collect('bbox_h', clips, 'det', occ, mem)
+        text, A = line(label, rows, MARGIN_M['bbox_h'])
+        print(text)
+        final[label] = (A, MARGIN_M['bbox_h'])
+    print()
+    print('### 차종별 위험통과 / 불필요우회 / 이관 (프레임·단면 건수)')
+    print()
+    keys = ['gt vp', 'gt bbox_h', 'det 2단계 + 점유 기억 15프레임']
+    print('| 차종 | 필요폭 m | ' + ' | '.join(f'{k} ({final[k][1]*100:.0f}cm)' for k in keys) + ' |')
+    print('|---|---:|' + '---|' * len(keys))
+    for ap in APPARATUS:
+        need = required_width_m(ap.id)
+        cells = []
+        for k in keys:
+            u, d, h, _ = counts(final[k][0], need, final[k][1])
+            cells.append(f'{u} / {d} / {h}')
+        print(f'| {ap.id} | {need:.2f} | ' + ' | '.join(cells) + ' |')
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument('--scale', nargs='+', default=None, choices=list(MARGIN_M))
     p.add_argument('--clips', nargs='*')
     p.add_argument('--source', default='gt', choices=['gt', 'det'])
     p.add_argument('--occ', type=int, choices=[1, 2], default=2)
+    p.add_argument('--compare', action='store_true', help='PR 본문용 전후 비교표(markdown)')
     p.add_argument('--memory', type=int, default=None, help='det 점유 기억 프레임(기본: judge.occupancy.OCC_MEMORY_FRAMES)')
     a = p.parse_args()
     clips = a.clips or clip_ids()
+    if a.compare:
+        return compare(clips)
     for name in a.scale or (['vp', 'bbox_h'] if a.source == 'gt' else ['bbox_h']):
         rows = collect(name, clips, a.source, a.occ, a.memory)
         A, _ = report(name, rows, a.source)

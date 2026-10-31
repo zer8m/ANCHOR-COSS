@@ -21,7 +21,7 @@ import numpy as np
 
 from common.apparatus import APPARATUS, required_width_m
 from common.bisa import clip_ids, load_det, load_gt, validator
-from judge import MARGIN_M, decide
+from judge import MARGIN_M, decide, margin_m
 from judge.handoff import DET_COLLAPSE, OCCLUSION, OCCUPANCY_REASONS, OUT_OF_RANGE, HandoffMonitor, frame_reasons, section_geometry
 from scale import measure_section
 
@@ -113,7 +113,7 @@ def fmt_min(cm):
 
 
 def report(scale_name, rows, source='gt'):
-    margin = MARGIN_M[scale_name]
+    margin = margin_m(scale_name, source)
     A = arrays(rows)
     check_against_decide_and_validator(rows, A, scale_name, margin)
     print(f'\n=== 스케일 {scale_name} · 여유 {margin*100:.0f} cm · {source} 모드 ({len(rows)} 프레임·단면) ===')
@@ -174,7 +174,7 @@ def stress_report(scale_name, rows):
     stress_rows = [r for r in rows if r['stress'] is not None]
     if not stress_rows:
         return
-    margin = MARGIN_M[scale_name]
+    margin = margin_m(scale_name, 'gt')
     clips = sorted({r['clip'] for r in stress_rows})
     print(f'\n--- 스트레스 ({scale_name}, 여유 {margin*100:.0f} cm): det 가 놓친 차를 점유에서 뺌, 대상 클립 {clips} ---')
     print('위험 후보 = 놓친 차를 뺀 잔여폭으로는 통과인데 정답은 필요폭 미달. 이관 감지가 막지 못한 프레임이 "위험 통과".')
@@ -206,13 +206,17 @@ def _before(A):
 
 
 def compare(clips):
-    """PR 본문용 전후 비교표(markdown). 판정 전 = 잔여폭 ≥ 필요폭 만 비교(여유 0, 이관 없음)."""
-    def line(label, rows, margin, scale_name=None):
+    """PR 본문용 전후 비교표(markdown). 판정 전 = 잔여폭 ≥ 필요폭 만 비교(여유 0, 이관 없음).
+    MAE·최대 과대추정은 '전체 / 이관 사유 프레임 제외' 둘 다 낸다(이관 프레임은 판정하지 않으므로)."""
+    def line(label, rows, margin):
         A = arrays(rows)
         err = A['res'] - A['truth']
+        clean = np.array([not r['reasons'] for r in rows])
         u0 = sum(counts(_before(A), required_width_m(a.id), 0.0)[0] for a in APPARATUS)
         d0 = sum(counts(_before(A), required_width_m(a.id), 0.0)[1] for a in APPARATUS)
-        cells = f'| {label} | {np.abs(err).mean()*100:.2f} | {err.max()*100:+.1f} | {u0} | {d0} |'
+        mae = f'{np.abs(err).mean()*100:.2f} / {np.abs(err[clean]).mean()*100:.2f}'
+        mx = f'{err.max()*100:+.1f} / {err[clean].max()*100:+.1f}'
+        cells = f'| {label} | {mae} | {mx} | {u0} | {d0} |'
         if margin is None:
             return cells + ' - | - | - | - |', None
         t = [counts(A, required_width_m(a.id), margin) for a in APPARATUS]
@@ -221,28 +225,37 @@ def compare(clips):
         ho = sorted({r['clip'] for r, h in zip(rows, mask) if h})
         return cells + f' {margin*100:.0f} | {sum(x[0] for x in t)} | {sum(x[1] for x in t)} | {int(mask.sum())} ({", ".join(ho)}) |', A
 
-    head = ('| 스케일 / 점유 | MAE cm | 최대 과대추정 cm | 판정 전 위험통과 | 판정 전 우회 | 여유 cm | 판정 후 위험통과 | 판정 후 우회 | 이관(pump-m) |\n'
-            '|---|---:|---:|---:|---:|---:|---:|---:|---|')
+    head = [
+        '| 스케일 / 점유 | MAE cm (전체 / 이관 사유 프레임 제외) | 최대 과대추정 cm (전체 / 제외) | 판정 전 위험통과 | 판정 전 우회 | 여유 cm | 판정 후 위험통과 | 판정 후 우회 | 이관 프레임(pump-m) |',
+        '|---|---:|---:|---:|---:|---:|---:|---:|---|']
     final = {}
     print('### gt 모드 (점유=GT footprint, 4275 프레임·단면; 위험통과·우회는 9차종 합)')
     print()
-    print(head)
+    print(head[0]); print(head[1])
     for name in ('naive', 'vp', 'bbox_h'):
         rows = collect(name, clips, 'gt')
-        text, A = line(name, rows, MARGIN_M.get(name))
+        text, A = line(name, rows, margin_m(name, 'gt') if name != 'naive' else None)
         print(text)
         if A is not None:
-            final[f'gt {name}'] = (A, MARGIN_M[name])
+            final[f'gt {name}'] = (A, margin_m(name, 'gt'))
     print()
     print('### det 모드 (bbox_h 스케일, 점유=det bbox; 도로 경계는 설치 측량 가정)')
     print()
-    print(head)
+    print(head[0]); print(head[1])
     for label, occ, mem in (('det 1단계(아래 변), 기억 없음', 1, 0), ('det 2단계(승용차 맞춤), 기억 없음', 2, 0),
                             ('det 2단계 + 점유 기억 15프레임', 2, 15)):
         rows = collect('bbox_h', clips, 'det', occ, mem)
-        text, A = line(label, rows, MARGIN_M['bbox_h'])
+        text, A = line(label, rows, margin_m('bbox_h', 'det'))
         print(text)
-        final[label] = (A, MARGIN_M['bbox_h'])
+        final[label] = (A, margin_m('bbox_h', 'det'))
+        if mem == 15:
+            by = {}
+            for r, h in zip(rows, A['oor'] | ((A['res'] - margin_m('bbox_h', 'det') >= required_width_m('pump-m')) & A['occ'])):
+                if h:
+                    by[r['clip']] = by.get(r['clip'], 0) + 1
+            print()
+            print('det 최종의 pump-m 이관 프레임 클립별:', dict(sorted(by.items())))
+            print()
     print()
     print('### 차종별 위험통과 / 불필요우회 / 이관 (프레임·단면 건수)')
     print()
@@ -260,7 +273,7 @@ def compare(clips):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument('--scale', nargs='+', default=None, choices=list(MARGIN_M))
+    p.add_argument('--scale', nargs='+', default=None, choices=list(MARGIN_M['gt']))
     p.add_argument('--clips', nargs='*')
     p.add_argument('--source', default='gt', choices=['gt', 'det'])
     p.add_argument('--occ', type=int, choices=[1, 2], default=2)

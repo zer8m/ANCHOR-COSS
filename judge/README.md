@@ -6,7 +6,14 @@
 이관  : out_of_range 이면 무조건. det_collapse·occlusion_suspect 는 '통과'가 될 때만 (불가는 유지)
 ```
 
-스케일여유(`judge.MARGIN_M`): vp 5 cm, bbox_h 20 cm. 근거는 `decide.py` 주석과 아래 한계 참고.
+스케일여유는 모드별(`judge.MARGIN_M`, `judge.margin_m(스케일, 모드)`):
+
+| 모드 | vp | bbox_h |
+|---|---:|---:|
+| gt (스케일 오차만) | 5 cm | 10 cm |
+| det (운용) | - | **20 cm** |
+
+20 cm 는 det 모드에서만 적용한다(점유·경계 오차까지 더해지는 운용 조건). 근거는 `decide.py` 주석과 아래 한계 참고.
 
 ## 이관 조건 (`python -X utf8 -m judge.handoff` 로 클립별 확정 비율 확인)
 

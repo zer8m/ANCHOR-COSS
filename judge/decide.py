@@ -14,8 +14,10 @@ from .handoff import OCCUPANCY_REASONS, OUT_OF_RANGE
 
 PASS, FAIL, HANDOFF = '통과', '불가', '관제이관'
 
-# 스케일여유(m) 시작값: scale/README.md 권장(footprint ≥5 cm, bbox ≥10 cm). 최소값은 eval.margin 으로 재확인한다.
-MARGIN_M = {'vp': 0.05, 'bbox_h': 0.10}
+# 스케일여유(m). vp 5 cm: GT 최대 과대추정 2.0 cm + 여유(scale/README.md 권장 ≥5 cm).
+# bbox_h 20 cm: det 모드에서 38클립 위험 통과 0 이면서 3.3 m 차종 우회가 늘지 않는 상한(30 cm 부터 139건).
+# 단 det 최대 과대추정은 S05 +50 cm 라 20 cm 도 SUV·트럭은 못 막는다(judge/README.md 한계).
+MARGIN_M = {'vp': 0.05, 'bbox_h': 0.20}
 
 
 @dataclass(frozen=True)

@@ -25,17 +25,18 @@ from judge import MARGIN_M, decide
 from judge.handoff import DET_COLLAPSE, OCCLUSION, OCCUPANCY_REASONS, OUT_OF_RANGE, HandoffMonitor, frame_reasons, section_geometry
 from scale import measure_section
 
-from .run import bbox_scale, predict_gt
+from .run import bbox_scale, predict_det, predict_gt
 
 SWEEP_CM = list(range(0, 21))
 
 
-def collect(scale_name, clips):
-    """클립·프레임·단면마다 한 행: 잔여폭, 스트레스 잔여폭, 정답, 확정된 이관 사유."""
+def collect(scale_name, clips, source='gt', occ=2, memory=None):
+    """클립·프레임·단면마다 한 행: 잔여폭, 스트레스 잔여폭, 정답, 확정된 이관 사유.
+    source='det' 이면 잔여폭이 이미 det 에서 나온 것이라 스트레스(점유 제거)는 하지 않는다."""
     rows = []
     for c in clips:
         gt, det = load_gt(c), load_det(c)
-        pred, scale = predict_gt(gt, scale_name)
+        pred, scale = predict_gt(gt, scale_name) if source == 'gt' else (predict_det(gt, det, scale_name, occ) if memory is None else predict_det(gt, det, scale_name, occ, memory))
         det_scale = bbox_scale(gt, use_height=True)
         res = {(p['frame'], p['section_id']): p['residual_width_m'] for p in pred['predictions']}
         dframes = {f['frame']: f['detections'] for f in det['frames']}
@@ -52,7 +53,7 @@ def collect(scale_name, clips):
                                       _f=f, _s=s))
         # 스트레스: 이 클립에서 점유 사유가 한 번이라도 확정되면 det 가 놓친 차를 뺀다
         seen = set().union(*(r['reasons'] for r in clip_rows))
-        missed = (lambda v: True) if DET_COLLAPSE in seen else (lambda v: bool(v.get('occluded'))) if OCCLUSION in seen else None
+        missed = None if source == 'det' else (lambda v: True) if DET_COLLAPSE in seen else (lambda v: bool(v.get('occluded'))) if OCCLUSION in seen else None
         for r in clip_rows:
             if missed is None:
                 r['stress'] = None
@@ -111,11 +112,11 @@ def fmt_min(cm):
     return '>20' if cm is None else str(cm)
 
 
-def report(scale_name, rows):
+def report(scale_name, rows, source='gt'):
     margin = MARGIN_M[scale_name]
     A = arrays(rows)
     check_against_decide_and_validator(rows, A, scale_name, margin)
-    print(f'\n=== 스케일 {scale_name} · 여유 {margin*100:.0f} cm · gt 모드 ({len(rows)} 프레임·단면) ===')
+    print(f'\n=== 스케일 {scale_name} · 여유 {margin*100:.0f} cm · {source} 모드 ({len(rows)} 프레임·단면) ===')
     print('(위험 통과·불필요 우회·이관·최소여유는 validate_width.py 및 judge.decide 와 교차 검증됨)')
     print(f"{'차종':8} {'필요폭':>5} | {'위험통과':>7} {'불필요우회':>9} {'이관':>5} | 위험 통과 0건 최소여유(cm)")
     mm = {}
@@ -144,11 +145,11 @@ def sweep_table(scale_name, A):
 
 def overestimate_report(scale_name, rows):
     """임계값 무관 최소여유. 데이터 속 정답 잔여폭이 차종 임계값 근처에 거의 없어서(위 스윕이 0cm 에서도 0건)
-    임계값별 최소여유는 변별력이 없다. 대신 이관되지 않은 프레임의 최대 과대추정(예측−정답)을 보면,
+    임계값별 최소여유는 변별력이 없다. 대신 이관 사유가 없는 프레임의 최대 과대추정(예측−정답)을 보면,
     여유 ≥ 그 값이면 어떤 임계값에서도 위험 통과가 없다."""
-    kept = [r for r in rows if OUT_OF_RANGE not in r['reasons']]
+    kept = [r for r in rows if not r['reasons']]   # 이관 사유가 있는 프레임은 판정하지 않으므로 제외
     over = np.array([r['residual'] - r['truth'] for r in kept])
-    print(f'\n[{scale_name}] 임계값 무관 최소여유 = 최대 과대추정 (범위 밖 제외 {len(kept)}개)')
+    print(f'\n[{scale_name}] 임계값 무관 최소여유 = 최대 과대추정 (이관 사유 없는 {len(kept)}개)')
     print('  과대추정 p99 %.1f cm, 최대 %.1f cm' % (np.percentile(over, 99) * 100, over.max() * 100))
     worst = sorted(kept, key=lambda r: r['truth'] - r['residual'])[:5]
     print('  상위 5:', ', '.join(f"{r['clip']} f{r['frame']} +{(r['residual']-r['truth'])*100:.1f}cm" for r in worst))
@@ -201,13 +202,16 @@ def stress_report(scale_name, rows):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument('--scale', nargs='+', default=['vp', 'bbox_h'], choices=list(MARGIN_M))
+    p.add_argument('--scale', nargs='+', default=None, choices=list(MARGIN_M))
     p.add_argument('--clips', nargs='*')
+    p.add_argument('--source', default='gt', choices=['gt', 'det'])
+    p.add_argument('--occ', type=int, choices=[1, 2], default=2)
+    p.add_argument('--memory', type=int, default=None, help='det 점유 기억 프레임(기본: judge.occupancy.OCC_MEMORY_FRAMES)')
     a = p.parse_args()
     clips = a.clips or clip_ids()
-    for name in a.scale:
-        rows = collect(name, clips)
-        A, _ = report(name, rows)
+    for name in a.scale or (['vp', 'bbox_h'] if a.source == 'gt' else ['bbox_h']):
+        rows = collect(name, clips, a.source, a.occ, a.memory)
+        A, _ = report(name, rows, a.source)
         sweep_table(name, A)
         overestimate_report(name, rows)
         stress_report(name, rows)

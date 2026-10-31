@@ -33,7 +33,7 @@ for (const v of VEHICLES) {
 
 // 데모 핵심: 같은 골목에서 차종에 따라 판정이 갈린다.
 const push = (id) => buildPush(VEHICLES.find((v) => v.id === id), obstacles, routes)
-assert.equal(push('ambulance').rerouted, false, '구급차는 원 경로')
+assert.equal(push('amb-s').rerouted, false, '구급차(소형)는 원 경로')
 assert.equal(push('pump-m').rerouted, true, '중형펌프차는 우회')
 
 console.log('pushedRoutes.test.js: 모든 검증 통과 ✅')

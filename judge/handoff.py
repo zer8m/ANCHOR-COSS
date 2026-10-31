@@ -18,6 +18,7 @@ from scale.bbox_calib import CAR
 DET_COLLAPSE = 'det_collapse'
 OCCLUSION = 'occlusion_suspect'
 OUT_OF_RANGE = 'out_of_range'
+ALL_REASONS = (DET_COLLAPSE, OCCLUSION, OUT_OF_RANGE)
 OCCUPANCY_REASONS = (DET_COLLAPSE, OCCLUSION)  # 점유를 과소평가 → 잔여폭이 실제보다 크게 나옴
 
 # 신뢰도 ≥0.85 인 유효 박스 기준은 scale.bbox_calib.collect_boxes 와 같다
@@ -27,7 +28,8 @@ WEAK_CONF, WEAK_PIXELS = 0.5, 1000   # 약한(가림 후보) 덩어리 하한
 PARTIAL_WIDTH_RATIO = 0.7            # 예상 차 폭의 70% 미만이면 일부만 보임 (S37 0.36, S30 실차 1.28)
 EDGE_MARGIN = (0.05, 0.10)           # 도로 좌/우 끝 5%/10% 는 제외 (오른쪽 끝 고정 물체 오탐 방지)
 MAX_RANGE_M = 32.0                   # T03 격자 검증 5~30 m + 여유 2 m
-WINDOW, RATIO = 15, 0.5              # 최근 15프레임 중 50% 이상이면 확정
+CONFIRM_WINDOW, CONFIRM_HITS = 15, 3  # 확정: 최근 15프레임 중 3회 이상 (빠르게)
+RELEASE_CLEAN = 30                   # 해제: 연속 30프레임 무검출 (느리게). 정지한 가림 물체의 깜빡임 방지
 
 
 def is_valid_box(d):
@@ -71,16 +73,26 @@ def frame_reasons(detections, geom, scale):
 
 
 class HandoffMonitor:
-    """단면 하나의 프레임별 사유를 모아 최근 WINDOW 프레임 중 RATIO 이상인 것만 확정한다(인과적)."""
+    """단면 하나의 사유별 비대칭 래치: 확정은 빠르게, 해제는 느리게(인과적).
+    가림 덩어리의 마스크·신뢰도가 문턱값 근처에서 오르내려도(S37) 감지가 풀리지 않게 한다."""
 
-    def __init__(self, window=WINDOW, ratio=RATIO):
-        self.hist, self.ratio = deque(maxlen=window), ratio
+    def __init__(self, window=CONFIRM_WINDOW, hits=CONFIRM_HITS, release=RELEASE_CLEAN):
+        self.window, self.hits, self.release = window, hits, release
+        self.recent = {r: deque(maxlen=window) for r in ALL_REASONS}
+        self.clean = dict.fromkeys(ALL_REASONS, 0)
+        self.latched = set()
 
     def update(self, reasons):
-        self.hist.append(set(reasons))
-        n = len(self.hist)
-        return {r for r in (DET_COLLAPSE, OCCLUSION, OUT_OF_RANGE)
-                if sum(r in h for h in self.hist) / n >= self.ratio}
+        for r in ALL_REASONS:
+            seen = r in reasons
+            self.recent[r].append(seen)
+            self.clean[r] = 0 if seen else self.clean[r] + 1
+            # 쌓인 프레임이 hits 보다 적은 클립 시작부는 한 번만 걸려도 확정(시작부 공백 방지)
+            if sum(self.recent[r]) >= min(self.hits, len(self.recent[r])):
+                self.latched.add(r)
+            elif r in self.latched and self.clean[r] >= self.release:
+                self.latched.discard(r)
+        return set(self.latched)
 
 
 def main():

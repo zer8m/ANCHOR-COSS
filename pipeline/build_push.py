@@ -1,8 +1,11 @@
 """차종별 센터 push JSON 생성 — 단말(src/components/NaviView.jsx)이 그대로 표출한다.
 
-    python -X utf8 -m pipeline.build_push          # public/push/{apparatus_id}.json 전부
-    python -X utf8 -m pipeline.build_push pump-m   # 하나만
+    python -X utf8 -m eval.run --source det --scale bbox_h   # 선행: outputs/det/ 생성
+    python -X utf8 -m pipeline.build_push                   # public/push/{apparatus_id}.json 전부
+    python -X utf8 -m pipeline.build_push pump-m            # 하나만
 
+판정은 judge.decide(변정은): 잔여폭 − 스케일여유(det·bbox_h = 20cm) ≥ 필요 통과폭이면 통과.
+이관 사유(out_of_range / det_collapse / occlusion_suspect)는 summarize 가 det 에서 감지해 넘긴다.
 모양은 src/lib/center.js buildPush() 와 같되, passable(bool) 대신 status('pass'|'block'|'handoff')다.
 경로는 src/data/pushedRoutes.js fixture 에서 가져온다(막힌 구간이 있으면 detour, 없으면 primary).
 """
@@ -12,13 +15,11 @@ import sys
 
 from common.apparatus import APPARATUS
 from common.bisa import REPO, load_json
-from pipeline.summarize import summarize
+from judge import FAIL, HANDOFF, PASS, decide, margin_m
+from pipeline.summarize import SCALE, SOURCE, summarize
 
-try:
-    from judge import judge  # 변정은 담당 — 생기면 자동으로 이쪽을 쓴다
-except ImportError:
-    from pipeline.judge_stub import judge
-
+STATUS = {PASS: 'pass', FAIL: 'block', HANDOFF: 'handoff'}  # judge(한글) → 단말(영문)
+MARGIN_M = margin_m(SCALE, SOURCE)
 CAMERAS = {k: v for k, v in load_json(REPO / 'pipeline' / 'cameras.json').items() if not k.startswith('_')}
 OUT_DIR = REPO / 'public' / 'push'
 
@@ -33,9 +34,13 @@ def build_push(apparatus, summaries, routes):
     segments = []
     for clip_id, cam in CAMERAS.items():
         s = summaries[clip_id]
-        status = judge(s['residual_m'], apparatus.id)['status'] if s['trusted'] else 'handoff'
+        if s['residual_m'] is None:
+            status, reasons = 'handoff', ('no_prediction',)
+        else:
+            v = decide(s['residual_m'], apparatus.id, MARGIN_M, s['reasons'])
+            status, reasons = STATUS[v.result], v.reasons
         segments.append({'id': cam['segment_id'], 'name': cam['name'], 'pos': routes['segmentPos'][cam['segment_id']],
-                         'status': status, 'clip_id': clip_id, 'reason': s['reason'] or None})
+                         'status': status, 'clip_id': clip_id, 'reason': ', '.join(reasons) or None})
     rerouted = any(seg['status'] == 'block' for seg in segments)
     return {
         'vehicleId': apparatus.id,
@@ -50,6 +55,8 @@ def build_push(apparatus, summaries, routes):
 def main(ids):
     routes = load_routes()
     summaries = {c: summarize(c) for c in CAMERAS}
+    for s in summaries.values():
+        print(f"{s['clip_id']}: 잔여 폭 {s['residual_m']}m (최근 {s['frames']}프레임 최솟값), 여유 {MARGIN_M}m, 이관 사유 {list(s['reasons']) or '없음'}")
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     for a in APPARATUS:
         if ids and a.id not in ids:

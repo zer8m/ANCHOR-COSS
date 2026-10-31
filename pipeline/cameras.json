@@ -1,4 +1,7 @@
 {
-  "_comment": "CCTV(납품 클립 id) → 단말 지도의 판정 구간 id. 구간 좌표는 src/data/pushedRoutes.js 의 segmentPos 에서 가져온다.",
-  "S21": { "segment_id": "o1", "name": "창신시장 인근 (창신길)" }
+  "_comment": "CCTV(납품 클립 id) → 단말 지도의 판정 구간 id. 구간 좌표는 src/data/pushedRoutes.js 의 segmentPos 에서 가져온다. S33(정답 잔여 2.92m, 경차 Kona)은 det 모드에서 경형만 통과·나머지 불가로 차종별 차이가 보인다. S21(정답 2.91m)은 det 가 12cm 과소추정해 전 차종 불가.",
+  "S33": {
+    "segment_id": "o1",
+    "name": "창신시장 인근 (창신길)"
+  }
 }

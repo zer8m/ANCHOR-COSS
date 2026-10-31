@@ -1,31 +1,40 @@
 """프레임워크 없이 직접 실행: python -X utf8 -m pipeline.test_pipeline
-지금 데모(잔여 폭 2.9m 구간)와 같은 결과가 나와야 한다: 구급차·경형은 통과, 소형펌프차 이상은 불가.
+judge.decide(det 여유 20cm) 를 단말 status 로 옮기는 부분과 push 모양을 검증한다. outputs/ 없이 돈다.
 """
 from common.apparatus import BY_ID
-from pipeline.build_push import build_push, load_routes
-from pipeline.judge_stub import judge
+from pipeline.build_push import CAMERAS, MARGIN_M, build_push, load_routes
 
-# judge 단독: 경계 3단계
-assert judge(2.9, 'pump-m')['status'] == 'block'      # 2.9 < 3.3
-assert judge(2.9, 'amb-s')['status'] == 'pass'        # 2.9 >= 2.8 + 0.10
-assert judge(2.95, 'amb-m')['status'] == 'handoff'    # 2.9 <= 2.95 < 3.0 경계
-assert judge(5.0, 'pump-m', scale_source='camera')['status'] == 'handoff'
-assert judge(2.9, 'pump-m')['required_m'] == 3.3 and judge(2.9, 'pump-m')['margin_m'] == -0.4
+assert MARGIN_M == 0.20  # det·bbox_h 운용 여유(judge.MARGIN_M). 바뀌면 아래 기대값도 같이 바꿀 것
 
-# build_push: 단말이 읽는 모양. summaries 를 직접 넣어 outputs/ 없이도 돈다.
 routes = load_routes()
-ok = {'S21': {'clip_id': 'S21', 'residual_m': 2.9, 'frames': 15, 'trusted': True, 'reason': ''}}
-amb = build_push(BY_ID['amb-s'], ok, routes)
-pump = build_push(BY_ID['pump-m'], ok, routes)
-assert amb['rerouted'] is False and amb['route'] is routes['primary'] and amb['abandonedPath'] == []
-assert pump['rerouted'] is True and pump['route'] is routes['detour'] and pump['abandonedPath'] == routes['primary']['path']
-assert pump['segments'][0] == {'id': 'o1', 'name': '창신시장 인근 (창신길)', 'pos': routes['segmentPos']['o1'],
-                               'status': 'block', 'clip_id': 'S21', 'reason': None}
-assert 'residual' not in str(pump['segments'])  # 계산 근거는 단말로 내보내지 않는다
+CLIP = next(iter(CAMERAS))  # cameras.json 의 첫 클립(데모 구간 o1)
 
-# 믿기 어려운 클립은 차종과 무관하게 handoff, 우회도 안 함
-bad = {'S21': {'clip_id': 'S21', 'residual_m': 1.0, 'frames': 15, 'trusted': False, 'reason': '가림'}}
-h = build_push(BY_ID['pump-m'], bad, routes)
-assert h['segments'][0]['status'] == 'handoff' and h['rerouted'] is False and h['segments'][0]['reason'] == '가림'
+
+def push(apparatus_id, residual_m, reasons=()):
+    summaries = {CLIP: {'clip_id': CLIP, 'residual_m': residual_m, 'frames': 15, 'reasons': reasons}}
+    return build_push(BY_ID[apparatus_id], summaries, routes)
+
+
+# 잔여 2.95m: 여유 0.2 빼면 2.75 → 경형(2.7)만 통과, 구급차(소형 2.8) 포함 나머지는 불가
+# (정확히 경계인 2.9 는 judge.decide 의 부동소수 비교(2.9-0.2 < 2.7)로 불가가 된다 — 안전 쪽이지만 변정은에게 전달)
+xs, amb, pump = push('pump-xs', 2.95), push('amb-s', 2.95), push('pump-m', 2.95)
+assert xs['segments'][0]['status'] == 'pass' and xs['rerouted'] is False
+assert amb['segments'][0]['status'] == 'block' and amb['rerouted'] is True
+assert pump['segments'][0] == {'id': 'o1', 'name': '창신시장 인근 (창신길)', 'pos': routes['segmentPos']['o1'],
+                               'status': 'block', 'clip_id': CLIP, 'reason': None}
+assert xs['route'] is routes['primary'] and xs['abandonedPath'] == []
+assert pump['route'] is routes['detour'] and pump['abandonedPath'] == routes['primary']['path']
+assert pump['requiredWidthM'] == 3.3
+assert 'residual' not in str(pump['segments'])  # 계산 근거(잔여 폭)는 단말로 내보내지 않는다
+
+# 이관 규칙(judge/README): out_of_range 는 무조건 이관, 검출 붕괴·가림은 '통과'가 될 때만 이관(불가는 유지)
+assert push('pump-xs', 5.0, ('out_of_range',))['segments'][0]['status'] == 'handoff'
+assert push('pump-xs', 5.0, ('det_collapse',))['segments'][0]['status'] == 'handoff'
+assert push('pump-m', 2.0, ('det_collapse',))['segments'][0]['status'] == 'block'
+h = push('pump-xs', 5.0, ('occlusion_suspect', 'out_of_range'))
+assert h['segments'][0]['reason'] == 'occlusion_suspect, out_of_range' and h['rerouted'] is False
+
+# 예측이 없으면 이관
+assert build_push(BY_ID['pump-m'], {CLIP: {'clip_id': CLIP, 'residual_m': None, 'frames': 0, 'reasons': ()}}, routes)['segments'][0]['status'] == 'handoff'
 
 print('test_pipeline.py: 모든 검증 통과 ✅')

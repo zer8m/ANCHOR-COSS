@@ -22,7 +22,8 @@ import numpy as np
 from common.apparatus import APPARATUS, required_width_m
 from common.bisa import clip_ids, load_det, load_gt, validator
 from judge import MARGIN_M, decide, margin_m
-from judge.handoff import DET_COLLAPSE, OCCLUSION, OCCUPANCY_REASONS, OUT_OF_RANGE, HandoffMonitor, frame_reasons, section_geometry
+from judge.handoff import (DET_COLLAPSE, OCCLUSION, OCCUPANCY_REASONS, SCALE_FALLBACK, UNCONDITIONAL_REASONS, HandoffMonitor,
+                           frame_reasons, section_geometry)
 from scale import measure_section
 
 from .run import bbox_scale, predict_det, predict_gt
@@ -43,6 +44,7 @@ def collect(scale_name, clips, source='gt', occ=2, memory=None):
         gt, det = load_gt(c), load_det(c)
         pred, scale = predict_gt(gt, scale_name) if source == 'gt' else (predict_det(gt, det, scale_name, occ) if memory is None else predict_det(gt, det, scale_name, occ, memory))
         det_scale = bbox_scale(gt, use_height=True)
+        fallback = str(scale.source).startswith('camera')   # 카메라 설치 정보로 대체한 스케일 → SCALE_FALLBACK (pipeline 이 넘기는 사유)
         res = {(p['frame'], p['section_id']): p['residual_width_m'] for p in pred['predictions']}
         dframes = {f['frame']: f['detections'] for f in det['frames']}
         geoms = {s['section_id']: section_geometry(det_scale, gt['camera'], s['left_edge']['px'], s['right_edge']['px'])
@@ -53,6 +55,8 @@ def collect(scale_name, clips, source='gt', occ=2, memory=None):
             for s in f['sections']:
                 sid = s['section_id']
                 reasons = mons[sid].update(frame_reasons(dframes.get(f['frame'], []), geoms[sid], det_scale))
+                if fallback:
+                    reasons = set(reasons) | {SCALE_FALLBACK}
                 clip_rows.append(dict(clip=c, frame=f['frame'], section=sid, residual=res[(f['frame'], sid)],
                                       truth=s['residual_width_m'], reasons=reasons, dist_m=geoms[sid]['dist_m'],
                                       _f=f, _s=s))
@@ -77,7 +81,7 @@ def arrays(rows, key='residual'):
     return dict(
         res=a(lambda r: r[key] if r[key] is not None else np.nan), truth=a(lambda r: r['truth']),
         occ=a(lambda r: any(x in OCCUPANCY_REASONS for x in r['reasons'])),
-        oor=a(lambda r: OUT_OF_RANGE in r['reasons']))
+        oor=a(lambda r: any(x in UNCONDITIONAL_REASONS for x in r['reasons'])))
 
 
 def counts(A, need, margin):
@@ -192,7 +196,7 @@ def stress_report(scale_name, rows):
             n += 1
             if passable_mask(r['stress'], margin, need) and r['truth'] < need:
                 cand += 1
-                if any(x in OCCUPANCY_REASONS for x in r['reasons']) or OUT_OF_RANGE in r['reasons']:
+                if any(x in OCCUPANCY_REASONS for x in r['reasons']) or any(x in UNCONDITIONAL_REASONS for x in r['reasons']):
                     continue
                 leak += 1
                 leaks[ap.id].append((r['clip'], r['frame'], r['section']))

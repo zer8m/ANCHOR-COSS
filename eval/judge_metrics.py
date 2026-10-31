@@ -30,6 +30,11 @@ from .run import bbox_scale, predict_det, predict_gt
 SWEEP_CM = list(range(0, 21))
 
 
+def passable_mask(res, margin, need):
+    """judge.decide 와 같은 mm 반올림 비교(벡터판)."""
+    return np.round(res - margin, 3) >= round(need, 3)
+
+
 def collect(scale_name, clips, source='gt', occ=2, memory=None):
     """클립·프레임·단면마다 한 행: 잔여폭, 스트레스 잔여폭, 정답, 확정된 이관 사유.
     source='det' 이면 잔여폭이 이미 det 에서 나온 것이라 스트레스(점유 제거)는 하지 않는다."""
@@ -77,7 +82,7 @@ def arrays(rows, key='residual'):
 
 def counts(A, need, margin):
     """판정 로직(judge.decide 와 같은 식)의 벡터판. 반환: 위험 통과, 불필요 우회, 이관, 전체."""
-    passable = A['res'] - margin >= need
+    passable = passable_mask(A['res'], margin, need)
     handoff = A['oor'] | (passable & A['occ'])
     ok = A['truth'] >= need
     return (int((passable & ~handoff & ~ok).sum()), int((~passable & ~handoff & ok).sum()),
@@ -102,7 +107,7 @@ def check_against_decide_and_validator(rows, A, scale_name, margin):
         unsafe_val = 0
         for c in sorted({r['clip'] for r in rows}):
             kept = [r for r in rows if r['clip'] == c and decide(r['residual'], ap.id, margin, r['reasons']).result != '관제이관']
-            preds = [dict(frame=r['frame'], section_id=r['section'], residual_width_m=max(r['residual'] - margin, 0.0)) for r in kept]
+            preds = [dict(frame=r['frame'], section_id=r['section'], residual_width_m=round(max(r['residual'] - margin, 0.0), 3)) for r in kept]
             out = v.evaluate(load_gt(c), {'clip_id': c, 'predictions': preds}, required_width_m=need)
             unsafe_val += out['unsafe_false_pass_count']
         assert unsafe_vec == unsafe_dec == unsafe_val, (scale_name, ap.id, unsafe_vec, unsafe_dec, unsafe_val)
@@ -185,7 +190,7 @@ def stress_report(scale_name, rows):
         cand = leak = n = 0
         for r in stress_rows:
             n += 1
-            if r['stress'] - margin >= need and r['truth'] < need:
+            if passable_mask(r['stress'], margin, need) and r['truth'] < need:
                 cand += 1
                 if any(x in OCCUPANCY_REASONS for x in r['reasons']) or OUT_OF_RANGE in r['reasons']:
                     continue
@@ -221,7 +226,7 @@ def compare(clips):
             return cells + ' - | - | - | - |', None
         t = [counts(A, required_width_m(a.id), margin) for a in APPARATUS]
         need = required_width_m('pump-m')
-        mask = A['oor'] | ((A['res'] - margin >= need) & A['occ'])
+        mask = A['oor'] | (passable_mask(A['res'], margin, need) & A['occ'])
         ho = sorted({r['clip'] for r, h in zip(rows, mask) if h})
         return cells + f' {margin*100:.0f} | {sum(x[0] for x in t)} | {sum(x[1] for x in t)} | {int(mask.sum())} ({", ".join(ho)}) |', A
 

@@ -2,15 +2,18 @@
 
   통과  : 잔여폭 − 스케일여유 ≥ 필요 통과폭(common.apparatus)
   불가  : 그렇지 않음
-  이관  : 범위 밖(out_of_range)이면 결과와 무관하게 이관(스케일을 신뢰할 수 없음).
+  이관  : 범위 밖(out_of_range)·스케일 대체(scale_fallback)이면 결과와 무관하게 이관(스케일을 신뢰할 수 없음).
           검출 붕괴·가림은 점유를 과소평가해 잔여폭이 크게 나오는 쪽이므로,
           '불가'는 그대로 두고 '통과'가 될 때만 이관으로 바꾼다.
+
+비교는 mm 단위로 반올림해서 한다(round(잔여폭 − 여유, 3) ≥ round(필요폭, 3)). 부동소수 오차로
+2.9 − 0.2 ≥ 2.7 이 False(2.6999999999999997)가 되는 것을 막는다.
 """
 from dataclasses import dataclass
 
 from common.apparatus import required_width_m
 
-from .handoff import OCCUPANCY_REASONS, OUT_OF_RANGE
+from .handoff import OCCUPANCY_REASONS, UNCONDITIONAL_REASONS
 
 PASS, FAIL, HANDOFF = '통과', '불가', '관제이관'
 
@@ -37,9 +40,9 @@ class Verdict:
 
 def decide(residual_m, apparatus_id, margin_m, reasons=()):
     need = required_width_m(apparatus_id)
-    passable = residual_m - margin_m >= need
+    passable = round(residual_m - margin_m, 3) >= round(need, 3)
     reasons = tuple(sorted(reasons))
-    if OUT_OF_RANGE in reasons or (passable and any(r in OCCUPANCY_REASONS for r in reasons)):
+    if any(r in UNCONDITIONAL_REASONS for r in reasons) or (passable and any(r in OCCUPANCY_REASONS for r in reasons)):
         result = HANDOFF
     else:
         result = PASS if passable else FAIL

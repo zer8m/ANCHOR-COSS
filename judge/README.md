@@ -15,6 +15,22 @@
 
 20 cm 는 det 모드에서만 적용한다(점유·경계 오차까지 더해지는 운용 조건). 근거는 `decide.py` 주석과 아래 한계 참고.
 
+## pipeline 에서 쓸 때
+
+```python
+from judge import decide, margin_m, PASS, FAIL, HANDOFF, SCALE_FALLBACK
+v = decide(residual_m, apparatus_id, margin_m('bbox_h', 'det'), reasons)   # v.result ∈ {PASS, FAIL, HANDOFF}
+```
+
+- **det 모드는 이관 사유 처리 없이 `decide` 만 쓰면 S32·S36 에서 위험 통과가 발생한다.** 이 두 클립은 det 가 차를 못 봐서 도로 전체가
+  비어 보이고(잔여폭 = 도로 폭), 사유 없이는 차종당 216건(필요폭 3.0 m 이상 차종)이 통과로 나온다. **pipeline 이 반드시 `reasons` 를 넘겨야 한다**
+  (`judge.handoff` 의 `HandoffMonitor`·`frame_reasons`·`section_geometry` 로 감지, 프레임 집계). 사유를 붙이면 0건.
+- `reasons` 의 사유: `det_collapse`, `occlusion_suspect`(통과가 될 때만 이관), `out_of_range`, `scale_fallback`(결과와 무관하게 이관).
+- `SCALE_FALLBACK`: 카메라 설치 정보로 대체한 스케일 등 스케일을 못 믿을 때 pipeline 이 직접 넘긴다. `frame_reasons` 는 내지 않는다.
+- 비교는 mm 단위 반올림: `round(잔여폭 − 여유, 3) ≥ round(필요폭, 3)` (부동소수로 `2.9 − 0.2 ≥ 2.7` 이 False 가 되던 문제 수정).
+- 테스트: `python -X utf8 -m judge.test_decide` (pytest 불필요). `decide(residual_m, apparatus_id, margin_m, reasons)` 시그니처,
+  `margin_m(scale, source)`, `PASS/FAIL/HANDOFF` 는 테스트로 고정.
+
 ## 이관 조건 (`python -X utf8 -m judge.handoff` 로 클립별 확정 비율 확인)
 
 | 사유 | 감지 | 38클립 결과 |

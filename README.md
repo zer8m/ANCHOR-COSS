@@ -15,7 +15,7 @@
 
 - 관제 영상은 관제센터 밖으로 반출할 수 없다. 그래서 단말은 **표출만** 한다 — 검출·판정·경로 계산을 하지 않고, 주행 화면에 잔여 폭 같은 계산 과정도 띄우지 않는다.
 - 전송은 출동 지령 시점의 **1회 단방향 push**다. 주행 중 경로 전환 로직은 없다.
-- 센터 push = `public/push/{차종id}.json` (파이썬 `pipeline/build_push.py` 산출물). 단말은 차종을 고르면 이 파일을 fetch해서 그린다.
+- 센터 push = `public/push/{장면}/{차종id}.json` (파이썬 `pipeline/build_push.py` 산출물, 장면은 `pipeline/cameras.json`의 `scenes`). 단말은 차종·장면을 고르면 이 파일을 fetch해서 그린다.
 - **push를 못 받으면 단말이 대신 판정하지 않는다.** 전 구간을 보류(handoff)로 두고 우회하며 "관제센터 판정 수신 실패" 배너를 띄운다(`center.js` `noCenterPush`). 단말 mock 판정(`buildPush`)은 테스트·fixture 검증에만 쓴다.
 - **판정 보류(handoff)도 우회한다.** 팀 원칙 "불가를 통과로 오판하는 쪽이 더 나쁘다"에 따라, 관제요원이 확인하기 전까지는 보류 구간을 지나지 않는다(`REROUTE_STATUSES = block, handoff`, 파이썬·JS 동일).
 
@@ -31,8 +31,8 @@
 2. **내비** — 안내 경로(파랑), 진입 불가로 버려진 원 경로(회색 점선), CCTV 판정 구간 마커(통과=회색 · 막힘=빨강 · 판정 보류=노랑), 턴 안내·속도·ETA.
    `handoff`(판정 보류)는 영상을 믿기 어려워(원거리·검출 붕괴·가림) 관제요원 확인으로 넘긴 상태 — 불가와 마찬가지로 우회하고 노란 배너를 띄운다.
    우상단 **차종 칩**을 누르면 *진입 기준 · 차종별 제원* 패널이 열리고, 차종을 바꾸면 같은 골목의 판정과 경로가 바뀐다
-   데모 구간 2곳: **o1**(납품 클립 S33, det 추정 잔여 폭 2.95m, 여유 20cm → 경형펌프차(2.7m)만 통과, 구급차·소형펌프차 이상은 불가)과
-   **o2**(S38, 단면 거리 38.6m > 32m → 항상 판정 보류). 그래서 경형은 통과+보류, 나머지는 불가+보류가 한 화면에 나오고 모두 우회한다.
+   기본 장면은 판정 구간 **o1**(납품 클립 S33, det 추정 잔여 폭 2.95m, 여유 20cm → 경형펌프차(2.7m)만 통과·직진, 구급차·소형펌프차 이상은 불가·우회) 하나라 **차종을 바꾸면 경로가 바뀐다**.
+   "보류 구간 시연" 토글을 켜면 **o2**(S38, 단면 거리 38.6m > 32m → 항상 판정 보류)가 추가돼 보류 마커·배너와 함께 전 차종이 우회한다(`public/push/{default|handoff}/`).
 
 ## 판정 기준
 
@@ -103,7 +103,7 @@ src/
     scenario.js             출발·목적지·판정 구간(잔여 폭)
     vehicles.js             차종 제원, 여유폭, 진입 기준, 법적 근거
     pushedRoutes.js         경로 fixture (스크립트 산출물 — 직접 수정 금지). pipeline이 push JSON에 그대로 싣는다
-public/push/{id}.json       차종별 센터 push (pipeline/build_push.py 산출물 — 직접 수정 금지)
+public/push/{scene}/{id}.json  장면·차종별 센터 push (pipeline/build_push.py 산출물 — 직접 수정 금지)
   lib/
     center.js               단말 내 mock 센터 buildPush() — push 파일 없을 때 폴백
     passable.js             폭 대조 판정
@@ -139,7 +139,7 @@ python -X utf8 -m common.apparatus         # 차종별 필요 통과폭 표
 ### pipeline — 추정 결과 → 단말 push
 
 ```
-pipeline/cameras.json    CCTV 클립 id → 단말 판정 구간 id
+pipeline/cameras.json    CCTV 클립 id → 단말 판정 구간 id, 장면(scenes)별 클립 묶음
 pipeline/summarize.py    outputs/det/{clip}_bbox_h_occ2_mem15.json → 구간 잔여 폭 하나(최근 15프레임 최솟값)
                          + judge.handoff 래치로 이관 사유(out_of_range / det_collapse / occlusion_suspect) 감지
 pipeline/build_push.py   judge.decide(잔여폭 − 여유 20cm ≥ 필요폭) → 차종별 public/push/{id}.json

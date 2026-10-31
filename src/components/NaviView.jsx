@@ -25,12 +25,14 @@ const arrowFor = (t = '') =>
 
 // 소방 출동 단말 — 센터가 밀어준 판정 결과·경로(push)를 지도 위에 표출만 한다.
 // 검출·판정·경로 계산은 하지 않는다. 계산 과정(유효폭 등)도 띄우지 않는다.
-// push = public/push/{차종}.json (관제센터 pipeline/build_push.py 산출물).
+// push = public/push/{장면}/{차종}.json (관제센터 pipeline/build_push.py 산출물).
+// 장면: default = 판정 구간 o1 만(차종에 따라 경로가 갈림) / handoff = o2(항상 보류) 추가 → 보류 표시·전 차종 우회 시연.
 // 못 받으면 단말이 대신 판정하지 않는다 — 전 구간 보류(handoff)·우회 + '판정 수신 실패' 배너(noCenterPush).
 export default function NaviView({ onExit }) {
   const [loading] = useKakaoLoader({ appkey: KAKAO_KEY ?? '', url: 'https://dapi.kakao.com/v2/maps/sdk.js' })
   const [vehicleId, setVehicleId] = useState(DEFAULT_VEHICLE_ID)
   const [panelOpen, setPanelOpen] = useState(false)
+  const [scene, setScene] = useState('default') // 'default' | 'handoff'
   // 경로 위 이동 거리(m). 어느 경로의 진행값인지 함께 들고 있어, 경로가 바뀐 첫 렌더에서 옛 값이 새 경로에 대입되지 않는다.
   const [progress, setProgress] = useState({ route: null, m: 0 })
 
@@ -40,7 +42,7 @@ export default function NaviView({ onExit }) {
   useEffect(() => {
     let alive = true
     setPush(null)
-    fetch(`/push/${vehicleId}.json`)
+    fetch(`/push/${scene}/${vehicleId}.json`)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .catch((e) => {
         console.warn(`센터 push 파일 없음(${e.message}) → 전 구간 보류 처리`)
@@ -50,7 +52,7 @@ export default function NaviView({ onExit }) {
     return () => {
       alive = false
     }
-  }, [vehicleId, vehicle])
+  }, [vehicleId, vehicle, scene])
   const route = push?.route ?? null
   const travelled = progress.route === route ? progress.m : 0
   const path = route?.path ?? []
@@ -206,6 +208,15 @@ export default function NaviView({ onExit }) {
         </div>
         <div className="tnavi-turncard-text">{turnRoad}</div>
       </div>
+
+      {/* 데모 장면 토글: 보류(handoff) 구간 o2 를 넣고 빼기 */}
+      <button
+        className={`tnavi-scene ${scene === 'handoff' ? 'on' : ''}`}
+        onClick={() => setScene((s) => (s === 'handoff' ? 'default' : 'handoff'))}
+        aria-pressed={scene === 'handoff'}
+      >
+        보류 구간 시연
+      </button>
 
       {/* 출동 차종 칩 (우상단) → 진입 기준·제원 패널 */}
       <button className="tnavi-vchip" onClick={() => setPanelOpen((v) => !v)} aria-expanded={panelOpen}>

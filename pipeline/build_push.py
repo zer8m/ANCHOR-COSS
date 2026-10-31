@@ -1,8 +1,10 @@
 """차종별 센터 push JSON 생성 — 단말(src/components/NaviView.jsx)이 그대로 표출한다.
 
     python -X utf8 -m eval.run --source det --scale bbox_h   # 선행: outputs/det/ 생성
-    python -X utf8 -m pipeline.build_push                   # public/push/{apparatus_id}.json 전부
-    python -X utf8 -m pipeline.build_push pump-m            # 하나만
+    python -X utf8 -m pipeline.build_push                   # public/push/{scene}/{apparatus_id}.json 전부
+    python -X utf8 -m pipeline.build_push pump-m            # 차종 하나만
+
+장면(scene)은 cameras.json 의 scenes: default(o1 만 — 차종별로 경로가 갈림) / handoff(o2 추가 — 보류 표시, 전 차종 우회).
 
 판정은 judge.decide(변정은): 잔여폭 − 스케일여유(det·bbox_h = 20cm) ≥ 필요 통과폭이면 통과.
 이관 사유(out_of_range / det_collapse / occlusion_suspect)는 summarize 가 det 에서 감지해 넘긴다.
@@ -22,8 +24,10 @@ STATUS = {PASS: 'pass', FAIL: 'block', HANDOFF: 'handoff'}  # judge(한글) → 
 # 우회를 일으키는 상태. 팀 원칙 "불가를 통과로 오판하는 쪽이 더 나쁘다" → 보류(handoff)도 우회. (src/lib/center.js 와 같게)
 REROUTE_STATUSES = ('block', 'handoff')
 MARGIN_M = margin_m(SCALE, SOURCE)
+_CFG = load_json(REPO / 'pipeline' / 'cameras.json')
+SCENES = _CFG['scenes']  # scene → [clip_id]
 CAMERAS = {k: {kk: vv for kk, vv in v.items() if not kk.startswith('_')}
-           for k, v in load_json(REPO / 'pipeline' / 'cameras.json').items() if not k.startswith('_')}
+           for k, v in _CFG.items() if not k.startswith('_') and k != 'scenes'}
 OUT_DIR = REPO / 'public' / 'push'
 
 
@@ -33,10 +37,11 @@ def load_routes():
     return json.loads(re.search(r'export default (\{.*\})', src, re.S).group(1))
 
 
-def build_push(apparatus, summaries, routes):
+def build_push(apparatus, summaries, routes, clips=None):
+    # clips: 이 push 에 넣을 클립 id 목록(장면). None 이면 cameras.json 전부.
     segments = []
-    for clip_id, cam in CAMERAS.items():
-        s = summaries[clip_id]
+    for clip_id in clips or CAMERAS:
+        cam, s = CAMERAS[clip_id], summaries[clip_id]
         if s['residual_m'] is None:
             status, reasons = 'handoff', ('no_prediction',)
         else:
@@ -60,15 +65,18 @@ def main(ids):
     summaries = {c: summarize(c) for c in CAMERAS}
     for s in summaries.values():
         print(f"{s['clip_id']}: 잔여 폭 {s['residual_m']}m (최근 {s['frames']}프레임 최솟값), 여유 {MARGIN_M}m, 이관 사유 {list(s['reasons']) or '없음'}")
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    for a in APPARATUS:
-        if ids and a.id not in ids:
-            continue
-        push = build_push(a, summaries, routes)
-        (OUT_DIR / f'{a.id}.json').write_text(json.dumps(push, ensure_ascii=False), encoding='utf-8')
-        print(f"{a.id:8} 필요폭 {push['requiredWidthM']:.2f}  "
-              + '  '.join(f"{s['id']}({s['clip_id']})={s['status']}" for s in push['segments'])
-              + ('  → 우회' if push['rerouted'] else ''))
+    for scene, clips in SCENES.items():
+        out = OUT_DIR / scene
+        out.mkdir(parents=True, exist_ok=True)
+        print(f'--- scene {scene}: {clips}')
+        for a in APPARATUS:
+            if ids and a.id not in ids:
+                continue
+            push = build_push(a, summaries, routes, clips)
+            (out / f'{a.id}.json').write_text(json.dumps(push, ensure_ascii=False), encoding='utf-8')
+            print(f"{a.id:8} 필요폭 {push['requiredWidthM']:.2f}  "
+                  + '  '.join(f"{s['id']}({s['clip_id']})={s['status']}" for s in push['segments'])
+                  + ('  → 우회' if push['rerouted'] else ''))
 
 
 if __name__ == '__main__':

@@ -234,6 +234,26 @@
   cursor: pointer;
 }
 
+.tnavi-scene {
+  position: absolute;
+  top: 28px;
+  right: 262px;
+  z-index: 3;
+  background: #fff;
+  border: 1px solid #eceef1;
+  border-radius: 999px;
+  padding: 9px 16px;
+  box-shadow: 0 12px 30px rgba(20, 30, 50, 0.14);
+  color: #6b7480;
+  font-size: 14px;
+  cursor: pointer;
+}
+.tnavi-scene.on {
+  background: #f4c430;
+  border-color: #f4c430;
+  color: #1c2026;
+  font-weight: 700;
+}
 .tnavi-vchip span {
   font-size: 15px;
   color: #6b7480;

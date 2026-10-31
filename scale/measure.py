@@ -26,7 +26,9 @@ def measure_section(scale, left_px, right_px, footprints):
     for fp in footprints:
         iv = _occupied_at(scale.to_ground(fp), depth)
         if iv:
-            blocks.append((max(iv[0], lo), min(iv[1], hi)))
+            a, b = max(iv[0], lo), min(iv[1], hi)
+            if a < b:  # 덩어리가 통째로 도로 밖이면 잘린 구간이 뒤집힌다 → 없는 빈 공간이 생기지 않게 버림
+                blocks.append((a, b))
     gaps, cur = [], lo
     for a, b in sorted(blocks):
         if a > cur:

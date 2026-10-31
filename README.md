@@ -15,7 +15,9 @@
 
 - 관제 영상은 관제센터 밖으로 반출할 수 없다. 그래서 단말은 **표출만** 한다 — 검출·판정·경로 계산을 하지 않고, 주행 화면에 잔여 폭 같은 계산 과정도 띄우지 않는다.
 - 전송은 출동 지령 시점의 **1회 단방향 push**다. 주행 중 경로 전환 로직은 없다.
-- 센터 push = `public/push/{차종id}.json` (파이썬 `pipeline/build_push.py` 산출물). 단말은 차종을 고르면 이 파일을 fetch해서 그린다. 파일이 없으면 `src/lib/center.js`의 `buildPush()`(단말 내 mock, 같은 모양)로 폴백한다.
+- 센터 push = `public/push/{차종id}.json` (파이썬 `pipeline/build_push.py` 산출물). 단말은 차종을 고르면 이 파일을 fetch해서 그린다.
+- **push를 못 받으면 단말이 대신 판정하지 않는다.** 전 구간을 보류(handoff)로 두고 우회하며 "관제센터 판정 수신 실패" 배너를 띄운다(`center.js` `noCenterPush`). 단말 mock 판정(`buildPush`)은 테스트·fixture 검증에만 쓴다.
+- **판정 보류(handoff)도 우회한다.** 팀 원칙 "불가를 통과로 오판하는 쪽이 더 나쁘다"에 따라, 관제요원이 확인하기 전까지는 보류 구간을 지나지 않는다(`REROUTE_STATUSES = block, handoff`, 파이썬·JS 동일).
 
 ```js
 // public/push/pump-m.json
@@ -27,7 +29,7 @@
 
 1. **출동 브리핑** — 신고 내용·위치. "안내 시작"으로 내비 화면 진입.
 2. **내비** — 안내 경로(파랑), 진입 불가로 버려진 원 경로(회색 점선), CCTV 판정 구간 마커(통과=회색 · 막힘=빨강 · 판정 보류=노랑), 턴 안내·속도·ETA.
-   `handoff`(판정 보류)는 경계 구간이거나 영상을 믿기 어려워 관제요원 확인으로 넘긴 상태 — 원 경로로 안내하되 노란 배너로 주의를 띄운다.
+   `handoff`(판정 보류)는 영상을 믿기 어려워(원거리·검출 붕괴·가림) 관제요원 확인으로 넘긴 상태 — 불가와 마찬가지로 우회하고 노란 배너를 띄운다.
    우상단 **차종 칩**을 누르면 *진입 기준 · 차종별 제원* 패널이 열리고, 차종을 바꾸면 같은 골목의 판정과 경로가 바뀐다
    (예: 데모 구간 S33 — det 추정 잔여 폭 2.95m, 여유 20cm → 경형펌프차(필요 2.7m)만 직진, 구급차·소형펌프차 이상은 우회).
 
@@ -64,10 +66,15 @@ npm run dev            # http://localhost:5173
 - 지도 표시에 **Kakao Maps JavaScript 키**가 필요하다(Kakao Developers → 플랫폼 Web 도메인에 `http://localhost:5173` 등록).
 - `KAKAO_REST_KEY`는 경로 fixture를 다시 캡처할 때만 필요하다.
 
+### 테스트
+
+`npm test`는 단말(JS)만 돈다. 파이썬 쪽은 따로 실행한다(프레임워크 없음, assert 스크립트).
+
 ```bash
-npm test       # node --test, 프레임워크 없음
-npm run lint   # oxlint
-npm run build
+npm test                                   # 단말: src/**/*.test.js
+npm run lint && npm run build
+python -X utf8 -m pipeline.test_pipeline   # pipeline: judge 연결·push 모양 (데이터 없이 돈다)
+python -X utf8 -m eval.judge_metrics --source det   # 판정 지표(위험 통과·불필요 우회·이관), 데이터 필요
 ```
 
 ### 시나리오 좌표를 바꿨을 때
@@ -143,6 +150,8 @@ python -X utf8 -m pipeline.build_push                     # public/push/*.json
 python -X utf8 -m pipeline.test_pipeline
 ```
 
-판정·이관 규칙과 근거는 `judge/README.md`. `handoff`는 단말이 노란 "판정 보류" 마커·배너로 표시한다.
+판정·이관 규칙과 근거는 `judge/README.md`. `handoff`는 단말이 노란 "판정 보류" 마커·배너로 표시하고 우회한다.
+
+입력 가정: `summarize.py`가 gt 파일에서 읽는 것은 **카메라 설치 정보(높이·화각)와 단면 도로 경계 px**뿐이다 — judge/eval과 같은 "CCTV 설치 시 1회 측량한 값" 가정이며, 정답 잔여 폭·차량 좌표는 쓰지 않는다.
 
 규칙: 정답 폭·월드 좌표를 예측 입력으로 쓰지 않는다. GT 모드 입력은 footprint px, 도로 경계 px, 차종뿐. 상세는 `scale/README.md`.

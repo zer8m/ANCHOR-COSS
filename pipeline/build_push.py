@@ -19,6 +19,8 @@ from judge import FAIL, HANDOFF, PASS, decide, margin_m
 from pipeline.summarize import SCALE, SOURCE, summarize
 
 STATUS = {PASS: 'pass', FAIL: 'block', HANDOFF: 'handoff'}  # judge(한글) → 단말(영문)
+# 우회를 일으키는 상태. 팀 원칙 "불가를 통과로 오판하는 쪽이 더 나쁘다" → 보류(handoff)도 우회. (src/lib/center.js 와 같게)
+REROUTE_STATUSES = ('block', 'handoff')
 MARGIN_M = margin_m(SCALE, SOURCE)
 CAMERAS = {k: v for k, v in load_json(REPO / 'pipeline' / 'cameras.json').items() if not k.startswith('_')}
 OUT_DIR = REPO / 'public' / 'push'
@@ -41,7 +43,7 @@ def build_push(apparatus, summaries, routes):
             status, reasons = STATUS[v.result], v.reasons
         segments.append({'id': cam['segment_id'], 'name': cam['name'], 'pos': routes['segmentPos'][cam['segment_id']],
                          'status': status, 'clip_id': clip_id, 'reason': ', '.join(reasons) or None})
-    rerouted = any(seg['status'] == 'block' for seg in segments)
+    rerouted = any(seg['status'] in REROUTE_STATUSES for seg in segments)
     return {
         'vehicleId': apparatus.id,
         'requiredWidthM': apparatus.required_width_m,

@@ -3,7 +3,7 @@ import { useKakaoLoader, Map, Polyline, CustomOverlayMap } from 'react-kakao-map
 import { dispatch, obstacles } from '../data/scenario.js'
 import { VEHICLES, DEFAULT_VEHICLE_ID } from '../data/vehicles.js'
 import pushedRoutes from '../data/pushedRoutes.js'
-import { buildPush } from '../lib/center.js'
+import { noCenterPush } from '../lib/center.js'
 import { haversine } from '../lib/geo.js'
 import VehiclePanel from './VehiclePanel.jsx'
 
@@ -25,7 +25,8 @@ const arrowFor = (t = '') =>
 
 // 소방 출동 단말 — 센터가 밀어준 판정 결과·경로(push)를 지도 위에 표출만 한다.
 // 검출·판정·경로 계산은 하지 않는다. 계산 과정(유효폭 등)도 띄우지 않는다.
-// push = public/push/{차종}.json (관제센터 pipeline/build_push.py 산출물). 없으면 단말 내 mock(buildPush) 폴백.
+// push = public/push/{차종}.json (관제센터 pipeline/build_push.py 산출물).
+// 못 받으면 단말이 대신 판정하지 않는다 — 전 구간 보류(handoff)·우회 + '판정 수신 실패' 배너(noCenterPush).
 export default function NaviView({ onExit }) {
   const [loading] = useKakaoLoader({ appkey: KAKAO_KEY ?? '', url: 'https://dapi.kakao.com/v2/maps/sdk.js' })
   const [vehicleId, setVehicleId] = useState(DEFAULT_VEHICLE_ID)
@@ -42,8 +43,8 @@ export default function NaviView({ onExit }) {
     fetch(`/push/${vehicleId}.json`)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .catch((e) => {
-        console.warn(`센터 push 파일 없음(${e.message}) → 단말 mock 판정으로 폴백`)
-        return buildPush(vehicle, obstacles, pushedRoutes)
+        console.warn(`센터 push 파일 없음(${e.message}) → 전 구간 보류 처리`)
+        return noCenterPush(vehicle, obstacles, pushedRoutes)
       })
       .then((p) => alive && setPush(p))
     return () => {
@@ -171,11 +172,19 @@ export default function NaviView({ onExit }) {
       </div>
 
       {/* 센터 판정 결과 (상단 중앙). 계산 근거는 표시하지 않는다. */}
-      {push.rerouted ? (
+      {push.noCenter ? (
+        <div className="tnavi-warning handoff" role="alert">
+          <span className="tnavi-warning-icon">⏳</span>
+          <div className="tnavi-warning-body">
+            <b>관제센터 판정 수신 실패</b>
+            <p>CCTV 구간 {count('handoff')}곳 전부 보류 처리 · 안전하게 우회 경로로 안내합니다</p>
+          </div>
+        </div>
+      ) : count('block') > 0 ? (
         <div className="tnavi-warning" role="status">
           <span className="tnavi-warning-icon">⚠️</span>
           <div className="tnavi-warning-body">
-            <b>진입 불가 구간 {count('block')}곳</b>
+            <b>진입 불가 구간 {count('block')}곳{count('handoff') > 0 ? ` · 보류 ${count('handoff')}곳` : ''}</b>
             <p>관제센터 판정 · 우회 경로로 안내합니다</p>
           </div>
         </div>
@@ -184,7 +193,7 @@ export default function NaviView({ onExit }) {
           <span className="tnavi-warning-icon">⏳</span>
           <div className="tnavi-warning-body">
             <b>판정 보류 구간 {count('handoff')}곳</b>
-            <p>관제요원 확인 중 · 원 경로로 안내, 진입 전 주의</p>
+            <p>관제요원 확인 중 · 안전하게 우회 경로로 안내합니다</p>
           </div>
         </div>
       ) : null}

@@ -28,13 +28,16 @@ assert pump['requiredWidthM'] == 3.3
 assert 'residual' not in str(pump['segments'])  # 계산 근거(잔여 폭)는 단말로 내보내지 않는다
 
 # 이관 규칙(judge/README): out_of_range 는 무조건 이관, 검출 붕괴·가림은 '통과'가 될 때만 이관(불가는 유지)
-assert push('pump-xs', 5.0, ('out_of_range',))['segments'][0]['status'] == 'handoff'
+# 보류도 우회한다(REROUTE_STATUSES) — 보류 구간을 원 경로로 그대로 지나가지 않는다.
+oor = push('pump-xs', 5.0, ('out_of_range',))
+assert oor['segments'][0]['status'] == 'handoff' and oor['rerouted'] is True and oor['route'] is routes['detour']
 assert push('pump-xs', 5.0, ('det_collapse',))['segments'][0]['status'] == 'handoff'
 assert push('pump-m', 2.0, ('det_collapse',))['segments'][0]['status'] == 'block'
 h = push('pump-xs', 5.0, ('occlusion_suspect', 'out_of_range'))
-assert h['segments'][0]['reason'] == 'occlusion_suspect, out_of_range' and h['rerouted'] is False
+assert h['segments'][0]['reason'] == 'occlusion_suspect, out_of_range' and h['rerouted'] is True
 
 # 예측이 없으면 이관
-assert build_push(BY_ID['pump-m'], {CLIP: {'clip_id': CLIP, 'residual_m': None, 'frames': 0, 'reasons': ()}}, routes)['segments'][0]['status'] == 'handoff'
+np_ = build_push(BY_ID['pump-m'], {CLIP: {'clip_id': CLIP, 'residual_m': None, 'frames': 0, 'reasons': ()}}, routes)
+assert np_['segments'][0]['status'] == 'handoff' and np_['rerouted'] is True
 
 print('test_pipeline.py: 모든 검증 통과 ✅')

@@ -24,8 +24,8 @@ export const briefing = {
 // 우회 경로가 막힌 지점에서 최소 이만큼(m) 떨어져야 "피했다"로 인정. 캡처 스크립트와 fixture 테스트가 공유.
 export const AVOID_MIN_M = 40
 
-// CCTV 판정 구간. effectiveWidthM = 주차 차량을 뺀 잔여 통과 폭(m).
-// 통과 여부는 데이터에 두지 않는다 — 차종별 필요 통과폭과 대조해 센터(center.js)가 판정.
+// CCTV 판정 구간. 운용 판정은 파이썬 pipeline(public/push/*.json)이 하고, 단말은 여기서 id·pos 만 쓴다.
+// effectiveWidthM(잔여 폭)은 mock buildPush(테스트·fixture 검증) 전용 — 화면 판정에는 쓰이지 않는다.
 // pos: 기획상 지점은 창신시장 골목(37.57318, 127.01142)이나, 그 골목은 Kakao 자동차 도로망에 없어
 //      최단 경로가 지나는 최근접 지점(창신길 · 시장 입구, 서쪽 65m)으로 옮겨 둠.
 export const obstacles = [
@@ -33,6 +33,6 @@ export const obstacles = [
     id: 'o1',
     name: '창신시장 인근 (창신길)',
     pos: { lat: 37.57313, lng: 127.01069 },
-    cause: { type: '불법주정차', vehicleCount: 3, effectiveWidthM: 2.9 }, // 구급차(2.8)·경형(2.7)은 통과, 소형(3.0) 이상은 불가
+    cause: { type: '불법주정차', vehicleCount: 1, effectiveWidthM: 2.9 }, // mock 전용. 납품 S33 정답 잔여 폭 2.92m 에 맞춤
   },
 ]

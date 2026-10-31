@@ -1,6 +1,6 @@
 // 프레임워크 없이 node로 직접 실행: `node src/lib/center.test.js`
 import assert from 'node:assert/strict'
-import { buildPush } from './center.js'
+import { REROUTE_STATUSES, buildPush, noCenterPush } from './center.js'
 import { VEHICLES, requiredWidthM } from '../data/vehicles.js'
 
 const byId = (id) => VEHICLES.find((v) => v.id === id)
@@ -41,5 +41,17 @@ assert.equal(pump.vehicleId, 'pump-m')
 
 // 단말로 나가는 페이로드에 계산 근거(잔여 폭)는 싣지 않는다 — 판정 결과만.
 assert.equal('effectiveWidthM' in pump.segments[1], false)
+
+// 판정 보류도 우회한다(팀 원칙: 불가를 통과로 오판하는 쪽이 더 나쁨).
+assert.deepEqual(REROUTE_STATUSES, ['block', 'handoff'])
+
+// 센터 push 를 못 받으면 단말이 대신 판정하지 않는다 — 전 구간 보류 + 우회 + noCenter 표시.
+const nc = noCenterPush(byId('amb-s'), segments, routes)
+assert.equal(nc.noCenter, true)
+assert.deepEqual(nc.segments.map((s) => s.status), ['handoff', 'handoff'])
+assert.equal(nc.segments[0].reason, 'no_center_push')
+assert.equal(nc.rerouted, true)
+assert.equal(nc.route, detour)
+assert.equal(nc.requiredWidthM, 2.8)
 
 console.log('center.test.js: 모든 검증 통과 ✅')

@@ -5,6 +5,8 @@
 - 잔여 폭: 최근 N프레임의 최솟값(단면이 여럿이면 그중 최솟값) — 안전한 쪽.
 - 이관 사유: judge.handoff 의 래치(HandoffMonitor)를 클립 끝까지 인과적으로 돌린 뒤 마지막 확정 상태.
   det 검출·설치 정보만 쓴다(정답 폭·GT 차량은 쓰지 않음). 사유 뜻은 judge/README.md.
+- gt 파일(load_gt)에서 읽는 것은 카메라 설치 정보(높이·화각·해상도)와 단면 도로 경계 px 뿐이다.
+  둘 다 "CCTV 설치 시 1회 측량한 값"으로 보는 judge/eval 과 같은 가정이며, 정답 잔여 폭·차량 좌표는 읽지 않는다.
 운용 모드(det · bbox_h · 점유 맞춤 2단계 · 점유 기억 15프레임)는 eval.run 기본값과 같다.
 """
 from collections import defaultdict

@@ -22,7 +22,8 @@ STATUS = {PASS: 'pass', FAIL: 'block', HANDOFF: 'handoff'}  # judge(한글) → 
 # 우회를 일으키는 상태. 팀 원칙 "불가를 통과로 오판하는 쪽이 더 나쁘다" → 보류(handoff)도 우회. (src/lib/center.js 와 같게)
 REROUTE_STATUSES = ('block', 'handoff')
 MARGIN_M = margin_m(SCALE, SOURCE)
-CAMERAS = {k: v for k, v in load_json(REPO / 'pipeline' / 'cameras.json').items() if not k.startswith('_')}
+CAMERAS = {k: {kk: vv for kk, vv in v.items() if not kk.startswith('_')}
+           for k, v in load_json(REPO / 'pipeline' / 'cameras.json').items() if not k.startswith('_')}
 OUT_DIR = REPO / 'public' / 'push'
 
 

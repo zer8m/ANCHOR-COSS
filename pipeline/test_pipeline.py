@@ -7,11 +7,12 @@ from pipeline.build_push import CAMERAS, MARGIN_M, build_push, load_routes
 assert MARGIN_M == 0.20  # det·bbox_h 운용 여유(judge.MARGIN_M). 바뀌면 아래 기대값도 같이 바꿀 것
 
 routes = load_routes()
-CLIP = next(iter(CAMERAS))  # cameras.json 의 첫 클립(데모 구간 o1)
+CLIP = next(iter(CAMERAS))  # cameras.json 의 첫 클립(데모 구간 o1). 나머지 클립은 넉넉히 통과(5m)로 채운다.
 
 
 def push(apparatus_id, residual_m, reasons=()):
-    summaries = {CLIP: {'clip_id': CLIP, 'residual_m': residual_m, 'frames': 15, 'reasons': reasons}}
+    summaries = {c: {'clip_id': c, 'residual_m': 5.0, 'frames': 15, 'reasons': ()} for c in CAMERAS}
+    summaries[CLIP] = {'clip_id': CLIP, 'residual_m': residual_m, 'frames': 15, 'reasons': reasons}
     return build_push(BY_ID[apparatus_id], summaries, routes)
 
 
@@ -37,7 +38,7 @@ h = push('pump-xs', 5.0, ('occlusion_suspect', 'out_of_range'))
 assert h['segments'][0]['reason'] == 'occlusion_suspect, out_of_range' and h['rerouted'] is True
 
 # 예측이 없으면 이관
-np_ = build_push(BY_ID['pump-m'], {CLIP: {'clip_id': CLIP, 'residual_m': None, 'frames': 0, 'reasons': ()}}, routes)
+np_ = build_push(BY_ID['pump-m'], {c: {'clip_id': c, 'residual_m': None, 'frames': 0, 'reasons': ()} for c in CAMERAS}, routes)
 assert np_['segments'][0]['status'] == 'handoff' and np_['rerouted'] is True
 
 print('test_pipeline.py: 모든 검증 통과 ✅')

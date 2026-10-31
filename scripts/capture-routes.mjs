@@ -7,7 +7,7 @@ import { detourWaypoint, nearestOnPath, minDistanceToPath } from '../src/lib/geo
 import { dispatch, obstacles, AVOID_MIN_M } from '../src/data/scenario.js'
 
 const BASE = 'http://localhost:5173'
-const AVOID_ID = 'o1' // 우회 경로가 피해야 하는 구간
+const AVOID_ID = 'o1' // 우회 경유지를 잡는 기준 구간. 우회 경로는 모든 판정 구간을 피해야 한다(아래 검사).
 const SNAP_MAX_M = 30 // 판정 구간 좌표가 원 경로에서 이보다 멀면 경로가 그 구간을 지나지 않는 것 → 중단
 const OFFSETS_M = [80, -80, 130, -130, 200, -200, 300, -300]
 
@@ -39,20 +39,21 @@ for (const off of OFFSETS_M) {
   const wp = detourWaypoint(primary.path, avoidAtM, off)
   try {
     const r = (await getRoutes(dispatch.currentPos, dispatch.destination, [wp], BASE))[0]
-    const clearM = minDistanceToPath(r.path, segmentPos[AVOID_ID])
-    console.log(`offset ${off}m → ${r.distanceM}m, 막힌 지점과 ${Math.round(clearM)}m`)
+    // 우회 경로 하나로 전 구간을 피해야 한다(어느 구간이 막히든 같은 우회로를 쓰므로)
+    const clearM = Math.min(...obstacles.map((o) => minDistanceToPath(r.path, segmentPos[o.id])))
+    console.log(`offset ${off}m → ${r.distanceM}m, 판정 구간과 최소 ${Math.round(clearM)}m`)
     if (clearM >= AVOID_MIN_M) cands.push(r)
   } catch (e) {
     console.log(`offset ${off}m → 실패: ${e.message}`)
   }
 }
-if (!cands.length) throw new Error(`막힌 지점(${AVOID_ID})을 ${AVOID_MIN_M}m 이상 피하는 우회 경로 없음`)
+if (!cands.length) throw new Error(`모든 판정 구간을 ${AVOID_MIN_M}m 이상 피하는 우회 경로 없음`)
 const detour = cands.reduce((a, b) => (b.distanceM < a.distanceM ? b : a))
 
 const out = {
   capturedAt: new Date().toISOString(),
   primary: slim(primary),
-  detour: { ...slim(detour), avoids: [AVOID_ID] },
+  detour: { ...slim(detour), avoids: obstacles.map((o) => o.id) },
   segmentPos,
 }
 writeFileSync(

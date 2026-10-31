@@ -30,6 +30,13 @@ export const AVOID_MIN_M = 40
 //      최단 경로가 지나는 최근접 지점(창신길 · 시장 입구, 서쪽 65m)으로 옮겨 둠.
 export const obstacles = [
   {
+    // o1 보다 94m 앞(출발지 쪽). 우회로가 이미 피해 가는 창신길 구간 안에 둠.
+    id: 'o2',
+    name: '창신길 하단 (시장 입구 전)',
+    pos: { lat: 37.57228, lng: 127.01067 },
+    cause: { type: '불법주정차', vehicleCount: 1, effectiveWidthM: 2.8 }, // mock 전용. 납품 S38 정답 잔여 폭 2.80m 에 맞춤
+  },
+  {
     id: 'o1',
     name: '창신시장 인근 (창신길)',
     pos: { lat: 37.57313, lng: 127.01069 },

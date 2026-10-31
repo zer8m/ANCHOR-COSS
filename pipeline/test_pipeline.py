@@ -37,6 +37,9 @@ assert push('pump-m', 2.0, ('det_collapse',))['segments'][0]['status'] == 'block
 h = push('pump-xs', 5.0, ('occlusion_suspect', 'out_of_range'))
 assert h['segments'][0]['reason'] == 'occlusion_suspect, out_of_range' and h['rerouted'] is True
 
+# 스케일 대체(scale_fallback)는 통과가 될 폭이어도 이관
+assert push('pump-xs', 5.0, ('scale_fallback',))['segments'][0]['status'] == 'handoff'
+
 # 예측이 없으면 이관
 np_ = build_push(BY_ID['pump-m'], {c: {'clip_id': c, 'residual_m': None, 'frames': 0, 'reasons': ()} for c in CAMERAS}, routes)
 assert np_['segments'][0]['status'] == 'handoff' and np_['rerouted'] is True

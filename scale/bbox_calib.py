@@ -45,6 +45,7 @@ class Camera:
         self.f = width_px / 2 / np.tan(np.radians(hfov_deg / 2))
         self.c = np.array([width_px / 2, height_px / 2])
         self.h, self.R = h, _rot(pitch, yaw, roll)
+        self.pitch, self.yaw, self.roll = pitch, yaw, roll
 
     def project(self, P):
         Pc = (np.atleast_2d(P) - [0, 0, self.h]) @ self.R.T

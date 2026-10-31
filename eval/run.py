@@ -3,12 +3,14 @@
     python -m eval.run --source gt                 # 소실점 보정 vs 기준선 비교
     python -m eval.run --source gt --scale vp --clips S03 S10
     python -m eval.run --source gt --scale bbox bbox_h   # 검출 bbox 자기보정 스케일
+    python -m eval.run --source gt --scale lane          # 분할 마스크 차선 소실점 + 설치 높이
 
 스케일 종류
   naive  : 단일 m/px (보정 전 기준선)
   vp     : GT footprint 소실점 보정
   bbox   : 검출 bbox 자기보정 — 같은 카메라 클립들의 bbox를 모아 높이·자세까지 추정
   bbox_h : 검출 bbox 자기보정 — 설치 높이만 알려줌
+  lane   : 분할 마스크의 흰 차선 교점 = 소실점(pitch·yaw), 설치 높이, roll 0. 차 크기 가정 없음
 bbox 계열도 폭 측정 자체는 GT footprint·경계로 해서 "스케일 오차"만 따로 본다.
 """
 import argparse
@@ -21,10 +23,11 @@ import numpy as np
 from common.bisa import REPO, clip_ids, load_det, load_gt, validator, vehicle_widths
 from scale import estimate_naive_scale, estimate_scale, measure_section
 from scale.bbox_calib import calibrate, collect_boxes
+from scale.lane_vp import lane_camera
 from scale.vanishing import scale_from_camera
 
 ESTIMATORS = {'naive': estimate_naive_scale, 'vp': estimate_scale}
-SCALES = ['naive', 'vp', 'bbox', 'bbox_h']
+SCALES = ['naive', 'vp', 'bbox', 'bbox_h', 'lane']
 
 
 def _camera_group(clip_id):
@@ -53,11 +56,30 @@ def bbox_scale(gt, use_height):
     return cam.vp_scale()
 
 
+@lru_cache
+def _lane_camera(group):
+    members = [c for c in clip_ids() if _camera_group(c) == group]
+    return lane_camera(members, load_gt(members[0])['camera'], _bbox_camera(group, True))
+
+
+def lane_scale(gt):
+    cam = _lane_camera(_camera_group(gt['clip_id']))
+    if cam is None:
+        s = scale_from_camera(gt['camera'])
+        s.source = 'camera(차선 없음)'
+        return s
+    s = cam.vp_scale()
+    s.source = 'lane_vp'
+    return s
+
+
 def predict_gt(gt, scale_name):
     """GT 입력: GT footprint 와 GT 도로 경계 px 만 쓴다(정답 폭·월드 좌표는 쓰지 않음)."""
     widths = vehicle_widths()
     obs = [{'type': v['type'], 'footprint_px': v['footprint_px']} for f in gt['frames'] for v in f['vehicles']]
-    if scale_name.startswith('bbox'):
+    if scale_name == 'lane':
+        scale = lane_scale(gt)
+    elif scale_name.startswith('bbox'):
         scale = bbox_scale(gt, use_height=scale_name == 'bbox_h')
     else:
         scale = ESTIMATORS[scale_name](obs, widths, gt['camera'])

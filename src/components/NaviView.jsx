@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useKakaoLoader, Map, Polyline, CustomOverlayMap } from 'react-kakao-maps-sdk'
-import { dispatch, obstacles } from '../data/scenario.js'
+import { SCENE_SEGMENTS, dispatch, obstacles } from '../data/scenario.js'
 import { VEHICLES, DEFAULT_VEHICLE_ID } from '../data/vehicles.js'
 import pushedRoutes from '../data/pushedRoutes.js'
 import { noCenterPush } from '../lib/center.js'
@@ -32,7 +32,9 @@ export default function NaviView({ onExit }) {
   const [loading] = useKakaoLoader({ appkey: KAKAO_KEY ?? '', url: 'https://dapi.kakao.com/v2/maps/sdk.js' })
   const [vehicleId, setVehicleId] = useState(DEFAULT_VEHICLE_ID)
   const [panelOpen, setPanelOpen] = useState(false)
+  // 장면 토글은 데모 전용(?demo=1 일 때만 표시). 실제 단말 화면에는 없다.
   const [scene, setScene] = useState('default') // 'default' | 'handoff'
+  const demo = new URLSearchParams(window.location.search).has('demo')
   // 경로 위 이동 거리(m). 어느 경로의 진행값인지 함께 들고 있어, 경로가 바뀐 첫 렌더에서 옛 값이 새 경로에 대입되지 않는다.
   const [progress, setProgress] = useState({ route: null, m: 0 })
 
@@ -46,7 +48,8 @@ export default function NaviView({ onExit }) {
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .catch((e) => {
         console.warn(`센터 push 파일 없음(${e.message}) → 전 구간 보류 처리`)
-        return noCenterPush(vehicle, obstacles, pushedRoutes)
+        // 장면에 속한 구간만 — 기본 장면에서 o2 가 나타나지 않도록
+        return noCenterPush(vehicle, obstacles.filter((o) => SCENE_SEGMENTS[scene].includes(o.id)), pushedRoutes)
       })
       .then((p) => alive && setPush(p))
     return () => {
@@ -209,14 +212,16 @@ export default function NaviView({ onExit }) {
         <div className="tnavi-turncard-text">{turnRoad}</div>
       </div>
 
-      {/* 데모 장면 토글: 보류(handoff) 구간 o2 를 넣고 빼기 */}
-      <button
-        className={`tnavi-scene ${scene === 'handoff' ? 'on' : ''}`}
-        onClick={() => setScene((s) => (s === 'handoff' ? 'default' : 'handoff'))}
-        aria-pressed={scene === 'handoff'}
-      >
-        보류 구간 시연
-      </button>
+      {/* 데모 장면 토글(?demo=1 전용): 보류(handoff) 구간 o2 를 넣고 빼기 */}
+      {demo && (
+        <button
+          className={`tnavi-scene ${scene === 'handoff' ? 'on' : ''}`}
+          onClick={() => setScene((s) => (s === 'handoff' ? 'default' : 'handoff'))}
+          aria-pressed={scene === 'handoff'}
+        >
+          보류 구간 시연
+        </button>
+      )}
 
       {/* 출동 차종 칩 (우상단) → 진입 기준·제원 패널 */}
       <button className="tnavi-vchip" onClick={() => setPanelOpen((v) => !v)} aria-expanded={panelOpen}>

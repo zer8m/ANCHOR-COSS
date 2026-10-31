@@ -2,7 +2,7 @@
 // 실제 데이터(시나리오 + 제원표 + fixture)가 서로 모순 없는지 검증.
 import assert from 'node:assert/strict'
 import routes from './pushedRoutes.js'
-import { obstacles, AVOID_MIN_M } from './scenario.js'
+import { SCENE_SEGMENTS, obstacles, AVOID_MIN_M } from './scenario.js'
 import { VEHICLES } from './vehicles.js'
 import { REROUTE_STATUSES, buildPush } from '../lib/center.js'
 import { minDistanceToPath, nearestOnPath, haversine } from '../lib/geo.js'
@@ -35,5 +35,10 @@ for (const v of VEHICLES) {
 const push = (id) => buildPush(VEHICLES.find((v) => v.id === id), obstacles, routes)
 assert.equal(push('amb-s').rerouted, false, '구급차(소형)는 원 경로')
 assert.equal(push('pump-m').rerouted, true, '중형펌프차는 우회')
+
+// 장면의 구간은 전부 시나리오에 있어야 한다.
+for (const ids of Object.values(SCENE_SEGMENTS)) {
+  for (const id of ids) assert.ok(obstacles.some((o) => o.id === id), `장면 구간 ${id} 가 obstacles 에 없음`)
+}
 
 console.log('pushedRoutes.test.js: 모든 검증 통과 ✅')

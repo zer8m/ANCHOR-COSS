@@ -28,6 +28,10 @@ export const AVOID_MIN_M = 40
 // effectiveWidthM(잔여 폭)은 mock buildPush(테스트·fixture 검증) 전용 — 화면 판정에는 쓰이지 않는다.
 // pos: 기획상 지점은 창신시장 골목(37.57318, 127.01142)이나, 그 골목은 Kakao 자동차 도로망에 없어
 //      최단 경로가 지나는 최근접 지점(창신길 · 시장 입구, 서쪽 65m)으로 옮겨 둠.
+// 데모 장면별 판정 구간. pipeline/cameras.json 의 scenes(클립 묶음)와 같은 구간이어야 한다.
+// 단말은 push 를 못 받았을 때(noCenterPush) 이 목록으로 장면에 맞는 구간만 보류 표시한다.
+export const SCENE_SEGMENTS = { default: ['o1'], handoff: ['o1', 'o2'] }
+
 export const obstacles = [
   {
     // o1 보다 94m 앞(출발지 쪽). 우회로가 이미 피해 가는 창신길 구간 안에 둠.

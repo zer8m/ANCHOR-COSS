@@ -2,9 +2,9 @@
 // 실제 데이터(시나리오 + 제원표 + fixture)가 서로 모순 없는지 검증.
 import assert from 'node:assert/strict'
 import routes from './pushedRoutes.js'
-import { obstacles, AVOID_MIN_M } from './scenario.js'
+import { SCENE_SEGMENTS, obstacles, AVOID_MIN_M } from './scenario.js'
 import { VEHICLES } from './vehicles.js'
-import { buildPush } from '../lib/center.js'
+import { REROUTE_STATUSES, buildPush } from '../lib/center.js'
 import { minDistanceToPath, nearestOnPath, haversine } from '../lib/geo.js'
 
 assert.ok(routes.primary.path.length >= 2 && routes.detour.path.length >= 2, '경로가 비어 있음')
@@ -23,17 +23,22 @@ for (const id of routes.detour.avoids) {
   assert.ok(minDistanceToPath(routes.detour.path, routes.segmentPos[id]) >= AVOID_MIN_M, `우회 경로가 ${id}를 지남`)
 }
 
-// 어떤 차종이든, 막힌 구간은 전부 우회 경로가 피하는 구간이어야 한다(막힌 곳을 지나는 "우회로" 방지).
+// 어떤 차종이든, 우회를 일으킨 구간(불가·보류)은 전부 우회 경로가 피하는 구간이어야 한다(막힌 곳을 지나는 "우회로" 방지).
 for (const v of VEHICLES) {
   const push = buildPush(v, obstacles, routes)
-  for (const s of push.segments.filter((x) => !x.passable)) {
+  for (const s of push.segments.filter((x) => REROUTE_STATUSES.includes(x.status))) {
     assert.ok(routes.detour.avoids.includes(s.id), `${v.name}: ${s.id}가 막혔는데 우회 경로가 피하지 않음`)
   }
 }
 
 // 데모 핵심: 같은 골목에서 차종에 따라 판정이 갈린다.
 const push = (id) => buildPush(VEHICLES.find((v) => v.id === id), obstacles, routes)
-assert.equal(push('ambulance').rerouted, false, '구급차는 원 경로')
+assert.equal(push('amb-s').rerouted, false, '구급차(소형)는 원 경로')
 assert.equal(push('pump-m').rerouted, true, '중형펌프차는 우회')
+
+// 장면의 구간은 전부 시나리오에 있어야 한다.
+for (const ids of Object.values(SCENE_SEGMENTS)) {
+  for (const id of ids) assert.ok(obstacles.some((o) => o.id === id), `장면 구간 ${id} 가 obstacles 에 없음`)
+}
 
 console.log('pushedRoutes.test.js: 모든 검증 통과 ✅')

@@ -1,4 +1,4 @@
-import { VEHICLES, ENTRY_CRITERIA, CRITERIA_SOURCE, LEGAL_BASIS, SPEC_SOURCE, SPEC_SOURCE_URL, CLEARANCE_SOURCE, CLEARANCE_SOURCE_URL, requiredWidthM } from '../data/vehicles.js'
+import { VEHICLES, ENTRY_CRITERIA, CRITERIA_SOURCE, LEGAL_BASIS, SOURCES, CLEARANCE_SOURCE, CLEARANCE_SOURCE_URL, requiredWidthM } from '../data/vehicles.js'
 
 // 진입 기준 + 차종별 제원 표. 행을 고르면 출동 차종이 바뀌고 센터 판정이 다시 계산된다.
 export default function VehiclePanel({ vehicleId, onSelect, onClose }) {
@@ -26,11 +26,11 @@ export default function VehiclePanel({ vehicleId, onSelect, onClose }) {
               <th scope="row">
                 <button onClick={() => onSelect(v.id)} aria-pressed={v.id === vehicleId}>
                   {v.name}
-                  {!v.verified && <small> 잠정</small>}
+                  {v.kind === 'legal_max' && <small> 잠정</small>}
                 </button>
               </th>
               <td>{v.widthM.toFixed(1)}m</td>
-              <td>{v.lengthM.toFixed(1)}m</td>
+              <td>{v.lengthM ? `${v.lengthM.toFixed(1)}m` : '–'}</td>
               <td>{v.heightM ? `${v.heightM.toFixed(1)}m` : '–'}</td>
               <td>{v.clearanceM.toFixed(1)}m</td>
               <td><b>{requiredWidthM(v).toFixed(1)}m</b></td>
@@ -43,7 +43,13 @@ export default function VehiclePanel({ vehicleId, onSelect, onClose }) {
         여유폭: <a href={CLEARANCE_SOURCE_URL} target="_blank" rel="noreferrer">{CLEARANCE_SOURCE}</a>
       </p>
       <p className="tnavi-vnote">
-        제원: <a href={SPEC_SOURCE_URL} target="_blank" rel="noreferrer">{SPEC_SOURCE}</a> (규격 상한값)
+        제원(차폭은 미러 제외 상한값):{' '}
+        {Object.entries(SOURCES).map(([k, src], i) => (
+          <span key={k}>
+            {i > 0 && ' · '}
+            <a href={src.url} target="_blank" rel="noreferrer" title={src.label}>{src.short}</a>
+          </span>
+        ))}
       </p>
 
       <dl className="tnavi-vcriteria">

@@ -111,6 +111,11 @@
   to { transform: translate(-50%, 0); opacity: 1; }
 }
 
+.tnavi-warning.handoff {
+  background: linear-gradient(150deg, #f4c430, #d9a80f);
+  color: #1c2026;
+  box-shadow: 0 16px 40px -8px rgba(217, 168, 15, 0.55);
+}
 .tnavi-warning-icon {
   font-size: 32px;
   line-height: 1;
@@ -166,6 +171,10 @@
   background: #e5352b;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35), 0 0 0 6px rgba(229, 53, 43, 0.25);
   animation: obs-blink 1.3s ease-in-out infinite;
+}
+.tnavi-obsmk.handoff {
+  background: #f4c430;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35), 0 0 0 6px rgba(244, 196, 48, 0.3);
 }
 
 /* 턴 카드 (라이트) */
@@ -225,6 +234,26 @@
   cursor: pointer;
 }
 
+.tnavi-scene {
+  position: absolute;
+  top: 28px;
+  right: 262px;
+  z-index: 3;
+  background: #fff;
+  border: 1px solid #eceef1;
+  border-radius: 999px;
+  padding: 9px 16px;
+  box-shadow: 0 12px 30px rgba(20, 30, 50, 0.14);
+  color: #6b7480;
+  font-size: 14px;
+  cursor: pointer;
+}
+.tnavi-scene.on {
+  background: #f4c430;
+  border-color: #f4c430;
+  color: #1c2026;
+  font-weight: 700;
+}
 .tnavi-vchip span {
   font-size: 15px;
   color: #6b7480;

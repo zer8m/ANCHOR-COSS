@@ -15,19 +15,24 @@
 
 - 관제 영상은 관제센터 밖으로 반출할 수 없다. 그래서 단말은 **표출만** 한다 — 검출·판정·경로 계산을 하지 않고, 주행 화면에 잔여 폭 같은 계산 과정도 띄우지 않는다.
 - 전송은 출동 지령 시점의 **1회 단방향 push**다. 주행 중 경로 전환 로직은 없다.
-- 지금은 `src/lib/center.js`의 `buildPush()`가 센터 역할을 한다(순수 함수). 관제센터 프로그램이 같은 모양의 JSON을 내보내면 이 함수만 교체하면 된다.
+- 센터 push = `public/push/{장면}/{차종id}.json` (파이썬 `pipeline/build_push.py` 산출물, 장면은 `pipeline/cameras.json`의 `scenes`). 단말은 차종·장면을 고르면 이 파일을 fetch해서 그린다.
+- **push를 못 받으면 단말이 대신 판정하지 않는다.** 전 구간을 보류(handoff)로 두고 우회하며 "관제센터 판정 수신 실패" 배너를 띄운다(`center.js` `noCenterPush`). 단말 mock 판정(`buildPush`)은 테스트·fixture 검증에만 쓴다.
+- **판정 보류(handoff)도 우회한다.** 팀 원칙 "불가를 통과로 오판하는 쪽이 더 나쁘다"에 따라, 관제요원이 확인하기 전까지는 보류 구간을 지나지 않는다(`REROUTE_STATUSES = block, handoff`, 파이썬·JS 동일).
 
 ```js
-buildPush(vehicle, segments, routes)
-// → { vehicleId, requiredWidthM, segments: [{ id, pos, passable }], rerouted, route, abandonedPath }
+// public/push/pump-m.json
+{ vehicleId, requiredWidthM, segments: [{ id, name, pos, status: 'pass'|'block'|'handoff', clip_id, reason }],
+  rerouted, route, abandonedPath }
 ```
 
 ## 화면
 
 1. **출동 브리핑** — 신고 내용·위치. "안내 시작"으로 내비 화면 진입.
-2. **내비** — 안내 경로(파랑), 진입 불가로 버려진 원 경로(회색 점선), CCTV 판정 구간 마커(막힘=빨강), 턴 안내·속도·ETA.
+2. **내비** — 안내 경로(파랑), 진입 불가로 버려진 원 경로(회색 점선), CCTV 판정 구간 마커(통과=회색 · 막힘=빨강 · 판정 보류=노랑), 턴 안내·속도·ETA.
+   `handoff`(판정 보류)는 영상을 믿기 어려워(원거리·검출 붕괴·가림) 관제요원 확인으로 넘긴 상태 — 불가와 마찬가지로 우회하고 노란 배너를 띄운다.
    우상단 **차종 칩**을 누르면 *진입 기준 · 차종별 제원* 패널이 열리고, 차종을 바꾸면 같은 골목의 판정과 경로가 바뀐다
-   (예: 잔여 폭 2.9m 구간 — 구급차·경형펌프차는 직진, 소형펌프차 이상은 우회).
+   기본 장면은 판정 구간 **o1**(납품 클립 S33, det 추정 잔여 폭 2.95m, 여유 20cm → 경형펌프차(2.7m)만 통과·직진, 구급차·소형펌프차 이상은 불가·우회) 하나라 **차종을 바꾸면 경로가 바뀐다**.
+   `?demo=1`로 열었을 때만 보이는 "보류 구간 시연" 토글을 켜면 **o2**(S38, 단면 거리 38.6m > 32m → 항상 판정 보류)가 추가돼 보류 마커·배너와 함께 전 차종이 우회한다(`public/push/{default|handoff}/`).
 
 ## 판정 기준
 
@@ -41,15 +46,16 @@ buildPush(vehicle, segments, routes)
 | 법적 근거 | — | 「건축법 시행령」 제41조, 「소방기본법」 제21조의2·시행령 제7조의12~14 |
 
 - 제원을 상한값으로 쓰는 이유: 불가를 가능으로 오판하는 쪽(현장 도착 후 진입 실패)이 불필요한 우회보다 더 나쁘다.
-- 구급차·물탱크차·고가사다리차 제원은 아직 **잠정값**이다(`verified: false`, 화면에 "잠정" 표시).
+- 차종 목록·id·차폭 근거(`kind`: spec_max / class_max / legal_max)는 파이썬 `common/apparatus.py`와 1:1이다. 사다리차·굴절차는 폭 규격을 못 찾아 법정 상한 2.5m(`legal_max`)를 쓰며 화면에 "잠정"으로 표시된다.
 - 건축법 시행령 제41조①의 통로 유효폭(0.9/1.5/3m)은 일반 건축물 통로 기준이라 소방차 통과폭으로 쓰지 않는다.
 
 ## 데모 시나리오
 
-서울 종로구 창신동: 을지로119안전센터 → (창신시장 인근 창신길, 불법주정차) → 창신6길 주택가. 데이터는 `src/data/scenario.js`.
+서울 종로구 창신동: 을지로119안전센터 → 창신길(판정 구간 o2 → 94m 뒤 o1, 불법주정차) → 창신6길 주택가. 데이터는 `src/data/scenario.js`, 구간↔CCTV 클립 매핑은 `pipeline/cameras.json`.
 
 경로는 Kakao 길찾기를 **개발 시 1회** 호출해 고정 fixture(`src/data/pushedRoutes.js`)로 저장한 것이다. 앱 런타임은 길찾기 API를 호출하지 않는다.
-우회 경로는 Kakao가 특정 도로 제외를 지원하지 않아 **경유지로 회피를 유도한 근사**이며, 캡처 스크립트가 "막힌 지점에서 40m 이상 떨어졌는지"를 검사해 통과한 후보 중 최단 경로를 고른다.
+우회 경로는 Kakao가 특정 도로 제외를 지원하지 않아 **경유지로 회피를 유도한 근사**이며, 캡처 스크립트가 "모든 판정 구간에서 40m 이상 떨어졌는지"를 검사해 통과한 후보 중 최단 경로를 고른다.
+우회 경로는 하나다(어느 구간이 걸리든 같은 우회로). 구간이 서로 다른 길에 놓여 조합별 우회가 필요해지면 `route/`를 만든다.
 
 ## 실행
 
@@ -62,10 +68,15 @@ npm run dev            # http://localhost:5173
 - 지도 표시에 **Kakao Maps JavaScript 키**가 필요하다(Kakao Developers → 플랫폼 Web 도메인에 `http://localhost:5173` 등록).
 - `KAKAO_REST_KEY`는 경로 fixture를 다시 캡처할 때만 필요하다.
 
+### 테스트
+
+`npm test`는 단말(JS)만 돈다. 파이썬 쪽은 따로 실행한다(프레임워크 없음, assert 스크립트).
+
 ```bash
-npm test       # node --test, 프레임워크 없음
-npm run lint   # oxlint
-npm run build
+npm test                                   # 단말: src/**/*.test.js
+npm run lint && npm run build
+python -X utf8 -m pipeline.test_pipeline   # pipeline: judge 연결·push 모양 (데이터 없이 돈다)
+python -X utf8 -m eval.judge_metrics --source det   # 판정 지표(위험 통과·불필요 우회·이관), 데이터 필요
 ```
 
 ### 시나리오 좌표를 바꿨을 때
@@ -91,14 +102,25 @@ src/
   data/
     scenario.js             출발·목적지·판정 구간(잔여 폭)
     vehicles.js             차종 제원, 여유폭, 진입 기준, 법적 근거
-    pushedRoutes.js         경로 fixture (스크립트 산출물 — 직접 수정 금지)
+    pushedRoutes.js         경로 fixture (스크립트 산출물 — 직접 수정 금지). pipeline이 push JSON에 그대로 싣는다
+public/push/{scene}/{id}.json  장면·차종별 센터 push (pipeline/build_push.py 산출물 — 직접 수정 금지)
   lib/
-    center.js               mock 관제센터: buildPush()
+    center.js               단말 내 mock 센터 buildPush() — push 파일 없을 때 폴백
     passable.js             폭 대조 판정
     geo.js                  haversine, 경로 투영, 점–경로 거리, 우회 경유지
     directions.js           Kakao 길찾기 호출·파싱 (캡처 스크립트 전용)
 scripts/capture-routes.mjs  경로 fixture 캡처
 ```
+
+## 발표 순서 (데모 대본)
+
+`http://localhost:5173/?demo=1`로 연다(토글은 이 주소에서만 보임 — 실제 단말에는 없는 버튼).
+
+1. 브리핑 → "안내 시작". 기본 차종 **중형펌프차**: o1 빨간 마커, "진입 불가 구간 1곳", 회색 점선(버려진 원 경로) + 파란 우회 경로.
+2. 차종 칩 → **경형펌프차**(필요폭 2.7m): o1 회색, 배너 없음, **직진**. — "같은 골목, 차종이 바뀌면 판정과 경로가 바뀐다."
+3. 차종 칩 → **구급차(소형)**(2.8m): 다시 우회. — "정답 폭(2.92m)으로는 들어가지만 추정 여유 20cm 때문에 안전 쪽으로 우회한다."
+4. **"보류 구간 시연"** 켬: o2 노란 마커, "판정 보류 구간 1곳", 경형도 우회. — "원거리 카메라처럼 판정을 믿을 수 없으면 관제요원에게 넘기고, 확인 전까지는 지나가지 않는다."
+5. 말할 때 주의: S33의 주차 차량은 **소형 SUV(코나)**다. "경차"라고 하지 않는다.
 
 ## 범위 밖 / 한계
 
@@ -118,10 +140,35 @@ data/      BISA_납품_* 폴더를 여기에 둔다 (git 제외)
 ```
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements.txt   # numpy · opencv-python(차선 소실점) · Pillow
 python -X utf8 -m eval.run --source gt --scale all   # 기준선·소실점·bbox 자기보정 비교
 python -X utf8 -m scale.grid_check         # T03 마커 격자 거리별 검증
 python -X utf8 -m common.apparatus         # 차종별 필요 통과폭 표
 ```
+
+### pipeline — 추정 결과 → 단말 push
+
+```
+pipeline/cameras.json    CCTV 클립 id → 단말 판정 구간 id, 장면(scenes)별 클립 묶음
+pipeline/summarize.py    outputs/det/{clip}_bbox_h_occ2_mem15.json → 구간 잔여 폭 하나(최근 15프레임 최솟값)
+                         + judge.handoff 래치로 이관 사유(out_of_range / det_collapse / occlusion_suspect) 감지
+pipeline/build_push.py   judge.decide(잔여폭 − 여유 20cm ≥ 필요폭) → 차종별 public/push/{id}.json
+                         (center.js buildPush 와 같은 모양, passable 대신 status: 통과→pass, 불가→block, 관제이관→handoff)
+```
+
+```bash
+python -X utf8 -m eval.run --source det --scale bbox_h   # outputs/det/ 생성 (선행, 운용 조건: det bbox + 설치 높이)
+python -X utf8 -m pipeline.build_push                     # public/push/*.json
+python -X utf8 -m pipeline.test_pipeline
+```
+
+판정·이관 규칙과 근거는 `judge/README.md`. `handoff`는 단말이 노란 "판정 보류" 마커·배너로 표시하고 우회한다.
+
+카메라 보정 캐시(설계, 미구현): 차선 소실점 보정(`scale/lane_vp.py`, 클립당 ~10초)은 `build_push`를 돌릴 때마다 할 일이 아니라
+**CCTV 설치 시 1회** 할 일이다. 붙일 때는 `pipeline/calib/{camera_id}.json`(높이·pitch·yaw·roll·화각·해상도)을 설치 단계에서 한 번 써 두고,
+`summarize`가 그 파일로 `Camera`를 만들어 스케일을 잡는 구조로 간다. 선행 조건: `eval.run.predict_det`의 lane 분기와 `judge.MARGIN_M['det']['lane']`(판정 담당).
+`camera_id`는 `pipeline/cameras.json`에 적는다(같은 카메라의 클립끼리만 보정을 합친다).
+
+입력 가정: `summarize.py`가 gt 파일에서 읽는 것은 **카메라 설치 정보(높이·화각)와 단면 도로 경계 px**뿐이다 — judge/eval과 같은 "CCTV 설치 시 1회 측량한 값" 가정이며, 정답 잔여 폭·차량 좌표는 쓰지 않는다.
 
 규칙: 정답 폭·월드 좌표를 예측 입력으로 쓰지 않는다. GT 모드 입력은 footprint px, 도로 경계 px, 차종뿐. 상세는 `scale/README.md`.

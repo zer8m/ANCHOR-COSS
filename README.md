@@ -140,7 +140,7 @@ data/      BISA_납품_* 폴더를 여기에 둔다 (git 제외)
 ```
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements.txt   # numpy · opencv-python(차선 소실점) · Pillow
 python -X utf8 -m eval.run --source gt --scale all   # 기준선·소실점·bbox 자기보정 비교
 python -X utf8 -m scale.grid_check         # T03 마커 격자 거리별 검증
 python -X utf8 -m common.apparatus         # 차종별 필요 통과폭 표
@@ -163,6 +163,11 @@ python -X utf8 -m pipeline.test_pipeline
 ```
 
 판정·이관 규칙과 근거는 `judge/README.md`. `handoff`는 단말이 노란 "판정 보류" 마커·배너로 표시하고 우회한다.
+
+카메라 보정 캐시(설계, 미구현): 차선 소실점 보정(`scale/lane_vp.py`, 클립당 ~10초)은 `build_push`를 돌릴 때마다 할 일이 아니라
+**CCTV 설치 시 1회** 할 일이다. 붙일 때는 `pipeline/calib/{camera_id}.json`(높이·pitch·yaw·roll·화각·해상도)을 설치 단계에서 한 번 써 두고,
+`summarize`가 그 파일로 `Camera`를 만들어 스케일을 잡는 구조로 간다. 선행 조건: `eval.run.predict_det`의 lane 분기와 `judge.MARGIN_M['det']['lane']`(판정 담당).
+`camera_id`는 `pipeline/cameras.json`에 적는다(같은 카메라의 클립끼리만 보정을 합친다).
 
 입력 가정: `summarize.py`가 gt 파일에서 읽는 것은 **카메라 설치 정보(높이·화각)와 단면 도로 경계 px**뿐이다 — judge/eval과 같은 "CCTV 설치 시 1회 측량한 값" 가정이며, 정답 잔여 폭·차량 좌표는 쓰지 않는다.
 

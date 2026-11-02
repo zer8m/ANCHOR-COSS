@@ -26,7 +26,7 @@ from pathlib import Path
 
 import numpy as np
 
-from common.bisa import REPO, clip_ids, load_det, load_gt, validator, vehicle_widths
+from common.bisa import REPO, clip_ids, load_det, load_gt, load_json, validator, vehicle_widths
 from judge.occupancy import OCC_MEMORY_FRAMES, OccupancyMemory, footprints
 from scale import estimate_naive_scale, estimate_scale, measure_section
 from scale.bbox_calib import calibrate, collect_boxes
@@ -37,9 +37,17 @@ ESTIMATORS = {'naive': estimate_naive_scale, 'vp': estimate_scale}
 SCALES = ['naive', 'vp', 'bbox', 'bbox_h', 'lane']
 
 
+@lru_cache
+def _camera_table():
+    return load_json(REPO / 'common' / 'cameras.json')['clips']
+
+
 def _camera_group(clip_id):
-    """같은 CCTV로 본 클립 묶음(운영에선 카메라 ID). 여기선 설치 pitch로 대신 구분: S31·S32만 다름."""
-    return round(load_gt(clip_id)['camera']['pitch_deg'])
+    """같은 CCTV 로 본 클립 묶음 = camera_id (common/cameras.json 의 clip → camera_id 표). 표에 없는 클립은 오류."""
+    try:
+        return _camera_table()[clip_id]
+    except KeyError:
+        raise KeyError(f'common/cameras.json 에 {clip_id} 의 camera_id 가 없다') from None
 
 
 @lru_cache

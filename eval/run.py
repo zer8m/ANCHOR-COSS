@@ -3,6 +3,7 @@
     python -m eval.run --source gt                 # 소실점 보정 vs 기준선 비교
     python -m eval.run --source gt --scale vp --clips S03 S10
     python -m eval.run --source gt --scale bbox bbox_h   # 검출 bbox 자기보정 스케일
+    python -m eval.run --source det --scale bbox_h --occ 2   # det bbox 만으로(스케일+점유폭)
 
 스케일 종류
   naive  : 단일 m/px (보정 전 기준선)
@@ -10,6 +11,11 @@
   bbox   : 검출 bbox 자기보정 — 같은 카메라 클립들의 bbox를 모아 높이·자세까지 추정
   bbox_h : 검출 bbox 자기보정 — 설치 높이만 알려줌
 bbox 계열도 폭 측정 자체는 GT footprint·경계로 해서 "스케일 오차"만 따로 본다.
+
+--source det : 점유(차가 차지하는 구간)도 det bbox 에서 구한다. 스케일은 bbox / bbox_h 만 가능(footprint 필요한 vp 불가).
+  가정: 도로 경계 px 는 CCTV 설치 시 1회 측량한 값이라고 보고 GT edge px 를 그대로 쓴다(det 에 도로 경계가 없음).
+  --memory K : 최근 K프레임의 점유 합집합(기본 15). det bbox 의 1~2프레임 글리치를 덮는다
+  --occ 1 : bbox 아래 변 양 끝을 지면으로 옮긴 구간(안전 쪽)   --occ 2 : 표준 승용차 맞춤으로 옆면 제거(맞춤 실패 시 1단계)
 """
 import argparse
 import json
@@ -19,6 +25,7 @@ from pathlib import Path
 import numpy as np
 
 from common.bisa import REPO, clip_ids, load_det, load_gt, validator, vehicle_widths
+from judge.occupancy import OCC_MEMORY_FRAMES, OccupancyMemory, footprints, residual_width
 from scale import estimate_naive_scale, estimate_scale, measure_section
 from scale.bbox_calib import calibrate, collect_boxes
 from scale.vanishing import scale_from_camera
@@ -71,16 +78,43 @@ def predict_gt(gt, scale_name):
     return {'clip_id': gt['clip_id'], 'predictions': preds}, scale
 
 
-def run(source, scale_name, clips, out_dir):
-    if source != 'gt':
-        raise NotImplementedError('--source det 은 2차 작업(YOLO bbox 스케일)')
+def predict_det(gt, det, scale_name, occ, memory=OCC_MEMORY_FRAMES):
+    """det 입력: det bbox(점유)와 설치 시 측량한 도로 경계 px(= GT edge px, 가정). 차종·정답 폭은 쓰지 않는다."""
+    use_h = scale_name == 'bbox_h'
+    cam = _bbox_camera(_camera_group(gt['clip_id']), use_h)
+    if cam is None:
+        scale = scale_from_camera(gt['camera'])
+        scale.source = 'camera(검출 없음)'
+        c = gt['camera']
+        f_h = c['width_px'] / 2 / np.tan(np.radians(c['hfov_deg'] / 2)) * c['height_from_road_m']
+        fit_cam = None
+    else:
+        scale, f_h, fit_cam = cam.vp_scale(), cam.f * cam.h, cam if occ == 2 else None
+    dframes = {f['frame']: f['detections'] for f in det['frames']}
+    preds, mem = [], OccupancyMemory(memory)
+    for f in gt['frames']:
+        fps = mem.update(footprints(dframes.get(f['frame'], []), scale, f_h, fit_cam))
+        for s in f['sections']:
+            res, road = residual_width(scale, s['left_edge']['px'], s['right_edge']['px'], fps)
+            preds.append(dict(frame=f['frame'], section_id=s['section_id'],
+                              residual_width_m=max(float(res), 0.0), road_width_m=float(road)))
+    return {'clip_id': gt['clip_id'], 'predictions': preds}, scale
+
+
+def run(source, scale_name, clips, out_dir, occ=2, memory=OCC_MEMORY_FRAMES):
+    if source == 'det' and not scale_name.startswith('bbox'):
+        raise SystemExit('--source det 는 --scale bbox / bbox_h 만 가능(vp 는 GT footprint 가 필요)')
     v = validator()
     rows = []
     for c in clips:
         gt = load_gt(c)
-        pred, scale = predict_gt(gt, scale_name)
+        if source == 'gt':
+            pred, scale = predict_gt(gt, scale_name)
+        else:
+            pred, scale = predict_det(gt, load_det(c), scale_name, occ, memory)
         r = v.evaluate(gt, pred)
-        (out_dir / f'{c}_{scale_name}.json').write_text(json.dumps(pred, ensure_ascii=False), encoding='utf-8')
+        tag = scale_name if source == 'gt' else f'{scale_name}_occ{occ}_mem{memory}'
+        (out_dir / f'{c}_{tag}.json').write_text(json.dumps(pred, ensure_ascii=False), encoding='utf-8')
         errs = np.array([x['error_m'] for x in r['rows']])
         rows.append(dict(clip=c, n=len(errs), mae=r['mae_m'], bias=float(errs.mean()), max=r['maximum_absolute_error_m'],
                          road_mae=r['road_width_mae_m'], src=scale.source, errs=errs))
@@ -92,12 +126,14 @@ def main():
     p.add_argument('--source', default='gt', choices=['gt', 'det'])
     p.add_argument('--scale', nargs='+', default=['naive', 'vp'], choices=SCALES + ['all'])
     p.add_argument('--clips', nargs='*')
+    p.add_argument('--occ', type=int, choices=[1, 2], default=2, help='det 점유폭 단계(1: 아래 변, 2: 표준 승용차 맞춤)')
+    p.add_argument('--memory', type=int, default=OCC_MEMORY_FRAMES, help='det 점유 기억 프레임 수(0이면 현재 프레임만)')
     a = p.parse_args()
     clips = a.clips or clip_ids()
     out_dir = REPO / 'outputs' / a.source
     out_dir.mkdir(parents=True, exist_ok=True)
     names = SCALES if 'all' in a.scale else a.scale
-    results = {n: run(a.source, n, clips, out_dir) for n in names}
+    results = {n: run(a.source, n, clips, out_dir, a.occ, a.memory) for n in names}
 
     print(f"{'clip':5}" + ''.join(f" | {n+' MAE':>9} {'bias':>7} {'max':>6} {'도로MAE':>7}" for n in names) + ' | scale src')
     for i, c in enumerate(clips):

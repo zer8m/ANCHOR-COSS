@@ -27,7 +27,7 @@ from pathlib import Path
 import numpy as np
 
 from common.bisa import REPO, clip_ids, load_det, load_gt, validator, vehicle_widths
-from judge.occupancy import OCC_MEMORY_FRAMES, OccupancyMemory, footprints, residual_width
+from judge.occupancy import OCC_MEMORY_FRAMES, OccupancyMemory, footprints
 from scale import estimate_naive_scale, estimate_scale, measure_section
 from scale.bbox_calib import calibrate, collect_boxes
 from scale.lane_vp import lane_camera
@@ -117,7 +117,7 @@ def predict_det(gt, det, scale_name, occ, memory=OCC_MEMORY_FRAMES):
     for f in gt['frames']:
         fps = mem.update(footprints(dframes.get(f['frame'], []), scale, f_h, fit_cam))
         for s in f['sections']:
-            res, road = residual_width(scale, s['left_edge']['px'], s['right_edge']['px'], fps)
+            res, road = measure_section(scale, s['left_edge']['px'], s['right_edge']['px'], fps)
             preds.append(dict(frame=f['frame'], section_id=s['section_id'],
                               residual_width_m=max(float(res), 0.0), road_width_m=float(road)))
     return {'clip_id': gt['clip_id'], 'predictions': preds}, scale

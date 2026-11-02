@@ -110,11 +110,11 @@ def predict_gt(gt, scale_name):
 
 def predict_det(gt, det, scale_name, occ, memory=OCC_MEMORY_FRAMES):
     """det 입력: det bbox(점유)와 설치 시 측량한 도로 경계 px(= GT edge px, 가정). 차종·정답 폭은 쓰지 않는다."""
-    use_h = scale_name == 'bbox_h'
-    cam = _bbox_camera(_camera_group(gt['clip_id']), use_h)
+    group = _camera_group(gt['clip_id'])
+    cam = _lane_camera(group) if scale_name == 'lane' else _bbox_camera(group, scale_name == 'bbox_h')   # lane: 차선 소실점 + 설치 높이
     if cam is None:
         scale = scale_from_camera(gt['camera'])
-        scale.source = 'camera(검출 없음)'
+        scale.source = 'camera(차선 없음)' if scale_name == 'lane' else 'camera(검출 없음)'
         c = gt['camera']
         f_h = c['width_px'] / 2 / np.tan(np.radians(c['hfov_deg'] / 2)) * c['height_from_road_m']
         fit_cam = None
@@ -132,8 +132,8 @@ def predict_det(gt, det, scale_name, occ, memory=OCC_MEMORY_FRAMES):
 
 
 def run(source, scale_name, clips, out_dir, occ=2, memory=OCC_MEMORY_FRAMES):
-    if source == 'det' and not scale_name.startswith('bbox'):
-        raise SystemExit('--source det 는 --scale bbox / bbox_h 만 가능(vp 는 GT footprint 가 필요)')
+    if source == 'det' and not (scale_name.startswith('bbox') or scale_name == 'lane'):
+        raise SystemExit('--source det 는 --scale bbox / bbox_h / lane 만 가능(vp 는 GT footprint 가 필요)')
     v = validator()
     rows = []
     for c in clips:

@@ -16,18 +16,14 @@ import re
 import sys
 
 from common.apparatus import APPARATUS
-from common.bisa import REPO, load_json
+from common.bisa import REPO
 from judge import FAIL, HANDOFF, PASS, decide, margin_m
-from pipeline.summarize import SCALE, SOURCE, summarize
+from pipeline.summarize import CAMERAS, SCALE, SCENES, SOURCE, summarize
 
 STATUS = {PASS: 'pass', FAIL: 'block', HANDOFF: 'handoff'}  # judge(한글) → 단말(영문)
 # 우회를 일으키는 상태. 팀 원칙 "불가를 통과로 오판하는 쪽이 더 나쁘다" → 보류(handoff)도 우회. (src/lib/center.js 와 같게)
 REROUTE_STATUSES = ('block', 'handoff')
 MARGIN_M = margin_m(SCALE, SOURCE)
-_CFG = load_json(REPO / 'pipeline' / 'cameras.json')
-SCENES = _CFG['scenes']  # scene → [clip_id]
-CAMERAS = {k: {kk: vv for kk, vv in v.items() if not kk.startswith('_')}
-           for k, v in _CFG.items() if not k.startswith('_') and k != 'scenes'}
 OUT_DIR = REPO / 'public' / 'push'
 
 

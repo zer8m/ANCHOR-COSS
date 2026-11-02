@@ -15,9 +15,27 @@ from collections import defaultdict
 from common.bisa import REPO, load_det, load_gt, load_json
 from eval.run import bbox_scale
 from judge import SCALE_FALLBACK, HandoffMonitor, frame_reasons, section_geometry
+from pipeline.calib import calib_path, save, scale_from_calib
 
 SOURCE, SCALE, OCC, MEMORY = 'det', 'bbox_h', 2, 15
 LAST_N_FRAMES = 15  # 15fps 기준 마지막 1초
+
+_CFG = load_json(REPO / 'pipeline' / 'cameras.json')
+SCENES = _CFG['scenes']  # scene → [clip_id]
+CAMERAS = {k: {kk: vv for kk, vv in v.items() if not kk.startswith('_')}
+           for k, v in _CFG.items() if not k.startswith('_') and k != 'scenes'}
+
+
+def camera_scale(clip_id, gt):
+    """이 클립 카메라의 스케일. camera_id 가 있으면 보정 캐시(pipeline/calib/)를 쓰고, 없으면 그 자리에서 만든다.
+    camera_id 가 없는 클립은 eval 과 같은 방식(pitch 묶음 bbox_h)으로 매번 계산."""
+    cid = CAMERAS.get(clip_id, {}).get('camera_id')
+    if not cid:
+        return bbox_scale(gt, use_height=True)
+    if not calib_path(cid).exists():
+        save(cid, clip_id)
+        print(f'[calib] {cid} 보정 캐시 생성 ← {clip_id}')
+    return scale_from_calib(cid, gt['camera'])
 
 
 def pred_path(clip_id):
@@ -27,7 +45,7 @@ def pred_path(clip_id):
 def handoff_reasons(clip_id):
     """클립 끝 시점에 확정돼 있는 이관 사유(전 단면 합집합)."""
     gt, det = load_gt(clip_id), load_det(clip_id)
-    scale = bbox_scale(gt, use_height=True)
+    scale = camera_scale(clip_id, gt)
     # 검출이 없어 카메라 설치 정보로 대체한 스케일은 못 믿는다 → 결과와 무관하게 이관(judge.SCALE_FALLBACK)
     latched = {SCALE_FALLBACK} if str(scale.source).startswith('camera') else set()
     for s in gt['frames'][0]['sections']:

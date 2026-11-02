@@ -31,7 +31,7 @@ DET_COLLAPSE_PIXELS = 20000          # 저신뢰 덩어리가 이보다 크면 �
 WEAK_CONF, WEAK_PIXELS = 0.5, 1000   # 약한(가림 후보) 덩어리 하한
 PARTIAL_WIDTH_RATIO = 0.7            # 예상 차 폭의 70% 미만이면 일부만 보임 (S37 0.36, S30 실차 1.28)
 EDGE_MARGIN = (0.05, 0.10)           # 도로 좌/우 끝 5%/10% 는 제외 (오른쪽 끝 고정 물체 오탐 방지)
-MAX_RANGE_M = 32.0                   # T03 격자 검증 5~30 m + 여유 2 m
+MAX_RANGE_M = 32.0                   # T03 격자 검증 5~30 m + 여유 2 m (거리 추정 오차 ≤2.7%: 정상 최대 30.6 m, S38 40.5 m)
 CONFIRM_WINDOW, CONFIRM_HITS = 15, 3  # 확정: 최근 15프레임 중 3회 이상 (빠르게)
 RELEASE_CLEAN = 30                   # 해제: 연속 30프레임 무검출 (느리게). 정지한 가림 물체의 깜빡임 방지
 
@@ -43,13 +43,22 @@ def is_valid_box(d):
             and VALID_ASPECT[0] <= w / h <= VALID_ASPECT[1])
 
 
+def ground_distance_m(scale, camera, px):
+    """화면 점 px 의 지면 전방 거리(m). 지평선(소실점)에서 아래로 v′ px 떨어진 점이면
+    깊이각 φ = θ + atan(v′/f − tanθ), 거리 = h / tanφ (θ = 카메라 기울기, tanθ = (cy − vp_y)/f).
+    보정된 스케일의 소실점(= 보정된 pitch)·설치 높이·화각만 써서 Camera 객체 없이 계산한다.
+    예전 식 f·h·D(= f·h/v′)는 pitch 를 무시해 GT 거리보다 평균 2% 짧고, 설치 정보 스케일(S32, pitch −26°)에서는 12% 짧았다."""
+    f = camera['width_px'] / 2 / np.tan(np.radians(camera['hfov_deg'] / 2))
+    tilt = (camera['height_px'] / 2 - scale.vp[1]) / f
+    v = float((np.asarray(px, float) - scale.vp) @ scale.n_dir)
+    return float(camera['height_from_road_m'] / np.tan(np.arctan(tilt) + np.arctan(v / f - tilt)))
+
+
 def section_geometry(scale, camera, left_px, right_px):
-    """단면 한 개의 정적 정보: 화면 행, 도로 x 범위, 카메라 거리(m). 설치 시 1회만 계산하면 된다."""
-    f_px = camera['width_px'] / 2 / np.tan(np.radians(camera['hfov_deg'] / 2))
-    _, depth = scale.to_ground([left_px, right_px])
+    """단면 한 개의 정적 정보: 화면 행, 도로 x 범위, 카메라 지면 거리(m). 설치 시 1회만 계산하면 된다."""
     xs = sorted([left_px[0], right_px[0]])
-    return dict(row=(left_px[1] + right_px[1]) / 2, x_lo=xs[0], x_hi=xs[1],
-                dist_m=float(f_px * camera['height_from_road_m'] * np.mean(depth)))
+    mid = ((left_px[0] + right_px[0]) / 2, (left_px[1] + right_px[1]) / 2)
+    return dict(row=mid[1], x_lo=xs[0], x_hi=xs[1], dist_m=ground_distance_m(scale, camera, mid))
 
 
 def frame_reasons(detections, geom, scale):

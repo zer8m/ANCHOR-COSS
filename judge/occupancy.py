@@ -15,7 +15,7 @@ from collections import deque
 
 import numpy as np
 
-from scale.bbox_calib import CAR
+from scale.bbox_calib import CAR, _box_bbox
 
 OCC_MIN_CONF, OCC_MIN_PIXELS = 0.4, 300   # 점유 후보 하한. 실차는 ≥0.5/≥580 px, 잡음은 대부분 이보다 작다
 COLLAPSE_PIXELS = 20000                   # 이보다 큰 저신뢰 덩어리는 분할 붕괴 → 점유로 안 쓰고 이관 쪽에서 처리
@@ -54,22 +54,18 @@ def ground_point(cam, px):
     return t * d_w[0], t * d_w[1]
 
 
-def _car_corners(X, Y, w, l, h):
-    return np.array([[X + sx * w / 2, Y + sy * l / 2, z] for sx in (-1, 1) for sy in (-1, 1) for z in (0, h)])
-
-
-def _bbox_of(cam, X, Y):
-    uv = cam.project(_car_corners(X, Y, CAR['width_m'], CAR['length_m'], CAR['height_m']))
-    return np.r_[uv.min(0), uv.max(0)]
-
-
 _FIT_CACHE = {}
+
+
+def _cam_key(cam):
+    """카메라 파라미터 값으로 만든 캐시 키(객체 id 는 재사용될 수 있고, 같은 보정을 다시 읽은 카메라와 캐시를 공유하지 못한다)."""
+    return (cam.f, *cam.c, cam.h, cam.pitch, cam.yaw, cam.roll)
 
 
 def fit_car(cam, bbox, comps=(0, 1, 2, 3)):
     """bbox 의 comps 번째 변(0 좌, 1 위, 2 우, 3 아래)에 표준 승용차 투영을 맞춘다.
     반환: (X, Y, 최대 변 오차 px) 또는 None. 정지한 차의 반복 프레임을 위해 bbox 를 2 px 단위로 묶어 캐시한다."""
-    key = (id(cam), tuple(int(round(v / 2)) for v in bbox), comps)
+    key = (_cam_key(cam), tuple(int(round(v / 2)) for v in bbox), comps)
     if key in _FIT_CACHE:
         return _FIT_CACHE[key]
     bbox, idx = np.asarray(bbox, float), list(comps)
@@ -79,19 +75,19 @@ def fit_car(cam, bbox, comps=(0, 1, 2, 3)):
         for dy in (CAR['length_m'] / 2, 0.0, CAR['length_m']):   # 아래 변이 차 앞/뒤 어느 쪽인지 모르므로 초기값 여러 개
             p, lam = np.array([g[0], g[1] + dy]), 1e-2
             for _ in range(15):
-                r = (_bbox_of(cam, *p) - bbox)[idx]
+                r = (_box_bbox(cam, *p, CAR) - bbox)[idx]
                 J = np.empty((len(idx), 2))
                 for i in range(2):
                     e = np.zeros(2); e[i] = 1e-3
-                    J[:, i] = ((_bbox_of(cam, *(p + e)) - _bbox_of(cam, *p)) / 1e-3)[idx]
+                    J[:, i] = ((_box_bbox(cam, *(p + e), CAR) - _box_bbox(cam, *p, CAR)) / 1e-3)[idx]
                 step = np.linalg.solve(J.T @ J + lam * np.eye(2), -J.T @ r)
-                if np.abs((_bbox_of(cam, *(p + step)) - bbox)[idx]).max() < np.abs(r).max():
+                if np.abs((_box_bbox(cam, *(p + step), CAR) - bbox)[idx]).max() < np.abs(r).max():
                     p, lam = p + step, lam / 3
                     if np.abs(step).max() < 1e-4:
                         break
                 else:
                     lam *= 5
-            err = float(np.abs((_bbox_of(cam, *p) - bbox)[idx]).max())
+            err = float(np.abs((_box_bbox(cam, *p, CAR) - bbox)[idx]).max())
             if best is None or err < best[2]:
                 best = (float(p[0]), float(p[1]), err)
             if best[2] < FIT_TOL_PX / 3:   # 충분히 맞으면 다른 초기값은 시도하지 않는다(속도)

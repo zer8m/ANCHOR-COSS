@@ -131,3 +131,41 @@ class OccupancyMemory:
     def update(self, quads):
         self.hist.append(quads)
         return [q for h in self.hist for q in h]
+
+
+# ── 임시 호환 함수: scale/exp_mask_side.py 전용 ────────────────────────────────────────────
+# 서희가 scale.measure_section 이 지면 다각형도 받게 옮기면 아래 두 함수를 삭제한다.
+# judge/·eval/ 코드는 이 함수를 쓰지 않는다(그쪽은 footprints() 의 px 4점 + scale.measure_section).
+def _interval_at(ground_poly, depth):
+    """지면 다각형 (X, D) 와 깊이 D=depth 횡단선의 교차 구간. 안 겹치면 None."""
+    X, D = ground_poly
+    xs = []
+    for i in range(len(X)):
+        j = (i + 1) % len(X)
+        d0, d1 = D[i] - depth, D[j] - depth
+        if d0 == 0:
+            xs.append(X[i])
+        if d0 * d1 < 0:
+            xs.append(X[i] + d0 / (d0 - d1) * (X[j] - X[i]))
+    return (min(xs), max(xs)) if len(xs) >= 2 else None
+
+
+def residual_width(scale, left_px, right_px, items):
+    """items = [(지면 다각형 (X, D), rho)]. 도로 밖 덩어리 제거 포함. scale/exp_mask_side.py 전용."""
+    ex, ed = scale.to_ground([left_px, right_px])
+    lo, hi = sorted(ex)
+    depth = float(np.mean(ed))
+    blocks = []
+    for ground, rho in items:
+        iv = _interval_at(ground, depth)
+        if iv:
+            a, b = max(iv[0] - rho * abs(iv[0]), lo), min(iv[1] + rho * abs(iv[1]), hi)
+            if a < b:
+                blocks.append((a, b))
+    gaps, cur = [], lo
+    for a, b in sorted(blocks):
+        if a > cur:
+            gaps.append(a - cur)
+        cur = max(cur, b)
+    gaps.append(max(hi - cur, 0.0))
+    return max(gaps), hi - lo

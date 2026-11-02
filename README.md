@@ -157,8 +157,9 @@ pipeline/build_push.py   judge.decide(잔여폭 − 여유 20cm ≥ 필요폭) �
 ```
 
 ```bash
-python -X utf8 -m eval.run --source det --scale bbox_h   # outputs/det/ 생성 (선행, 운용 조건: det bbox + 설치 높이)
-python -X utf8 -m pipeline.build_push                     # public/push/*.json
+python -X utf8 -m pipeline.calib --force                  # 1) 카메라 보정 캐시 (보정 코드·카메라가 바뀌었을 때)
+python -X utf8 -m eval.run --source det --scale bbox_h   # 2) outputs/det/ 생성 (운용 조건: det bbox + 설치 높이)
+python -X utf8 -m pipeline.build_push                     # 3) public/push/*.json
 python -X utf8 -m pipeline.test_pipeline
 ```
 
@@ -166,7 +167,8 @@ python -X utf8 -m pipeline.test_pipeline
 
 카메라 보정 캐시(`pipeline/calib.py`): 카메라 보정은 `build_push`를 돌릴 때마다 할 일이 아니라 **CCTV 설치 시 1회** 할 일이다.
 `python -X utf8 -m pipeline.calib`가 `cameras.json`의 `camera_id`별로 `pipeline/calib/{camera_id}.json`(설치 높이·pitch·yaw·roll·화각·해상도)을
-저장하고, `summarize`는 그 파일로 스케일을 만든다(없으면 그 자리에서 만들어 저장). 지금 저장하는 값은 eval과 같은 bbox_h 보정이라 push 결과는 동일하며,
+저장하고, `summarize`는 그 파일로 스케일을 만든다(없으면 그 자리에서 만들어 저장). 캐시에는 보정 코드(`scale/bbox_calib.py` 등)의 해시가 들어 있어
+코드가 바뀐 뒤 옛 캐시를 읽으면 에러가 난다 → `pipeline.calib --force`. 지금 저장하는 값은 eval과 같은 bbox_h 보정이라 push 결과는 동일하며,
 lane 소실점 보정(클립당 ~10초)으로 정해지면 `compute_camera()`의 계산만 바꾼다. 선행 조건: `eval.run.predict_det`의 lane 분기와 `judge.MARGIN_M['det']['lane']`(판정 담당).
 
 지표 변동 이력: 이관 366건(10/31) → 450건(11/2)은 변정은 `SCALE_FALLBACK`(ba8f2ec) 반영으로 S32(검출 없음, 설치 정보 대체 스케일) 150프레임이 이관으로 바뀐 것이다. 조서희 측정 수정(lane-vp)은 det 결과를 바꾸지 않았다(det 경로는 같은 검사를 가진 `judge.occupancy.residual_width` 사용).

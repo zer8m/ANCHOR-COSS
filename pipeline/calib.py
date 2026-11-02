@@ -30,7 +30,7 @@ CODE_FILES = ('scale/bbox_calib.py', 'scale/vanishing.py', 'eval/run.py', 'pipel
 def code_fingerprint():
     h = hashlib.sha1()
     for f in CODE_FILES:
-        h.update((REPO / f).read_bytes())
+        h.update((REPO / f).read_bytes().replace(b'\r\n', b'\n'))  # PC별 체크아웃 줄바꿈(CRLF/LF) 차이 무시
     return h.hexdigest()[:12]
 
 

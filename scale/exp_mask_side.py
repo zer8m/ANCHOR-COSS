@@ -18,7 +18,8 @@ import cv2
 from PIL import Image
 import judge.occupancy as occ
 import eval.run as er
-from judge.occupancy import OccupancyMemory, residual_width
+from judge.occupancy import OccupancyMemory
+from scale import measure_section
 from scale.vanishing import scale_from_camera
 from common.bisa import REPO, clip_ids, data_root, load_gt, load_det, validator
 from scale.lane_vp import lane_camera
@@ -121,6 +122,14 @@ def lane_cam(group):
     return lane_camera(members, load_gt(members[0])['camera'], er._bbox_camera(group, True), roll=0.0)
 
 
+def ground_to_px(scale, poly):
+    """지면 다각형 (X, D) → px 4점. VPScale.to_ground 의 역변환(measure_section 은 px footprint 를 받는다)."""
+    X, D = poly
+    v = 1.0 / D
+    u = X * v / scale.k
+    return scale.vp + np.outer(u, scale.h_dir) + np.outer(v, scale.n_dir)
+
+
 def predict(gt, det):
     g = er._camera_group(gt['clip_id'])
     cam = lane_cam(g) if CAM == 'lane' else er._bbox_camera(g, True)
@@ -136,9 +145,9 @@ def predict(gt, det):
     for f in gt['frames']:
         mp = mdir / ('%06d_mask.png' % f['frame'])
         mask = np.array(Image.open(mp)) if mp.exists() else None
-        fps = mem.update(footprints_mask(dframes.get(f['frame'], []), scale, f_h, cam, mask))
+        fps = mem.update([ground_to_px(scale, poly) for poly, _ in footprints_mask(dframes.get(f['frame'], []), scale, f_h, cam, mask)])
         for s in f['sections']:
-            r, road = residual_width(scale, s['left_edge']['px'], s['right_edge']['px'], fps)
+            r, road = measure_section(scale, s['left_edge']['px'], s['right_edge']['px'], fps)
             preds.append(dict(frame=f['frame'], section_id=s['section_id'],
                               residual_width_m=max(float(r), 0.0), road_width_m=float(road)))
     return {'clip_id': gt['clip_id'], 'predictions': preds}

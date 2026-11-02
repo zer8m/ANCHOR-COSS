@@ -164,10 +164,12 @@ python -X utf8 -m pipeline.test_pipeline
 
 판정·이관 규칙과 근거는 `judge/README.md`. `handoff`는 단말이 노란 "판정 보류" 마커·배너로 표시하고 우회한다.
 
-카메라 보정 캐시(설계, 미구현): 차선 소실점 보정(`scale/lane_vp.py`, 클립당 ~10초)은 `build_push`를 돌릴 때마다 할 일이 아니라
-**CCTV 설치 시 1회** 할 일이다. 붙일 때는 `pipeline/calib/{camera_id}.json`(높이·pitch·yaw·roll·화각·해상도)을 설치 단계에서 한 번 써 두고,
-`summarize`가 그 파일로 `Camera`를 만들어 스케일을 잡는 구조로 간다. 선행 조건: `eval.run.predict_det`의 lane 분기와 `judge.MARGIN_M['det']['lane']`(판정 담당).
-`camera_id`는 `pipeline/cameras.json`에 적는다(같은 카메라의 클립끼리만 보정을 합친다).
+카메라 보정 캐시(`pipeline/calib.py`): 카메라 보정은 `build_push`를 돌릴 때마다 할 일이 아니라 **CCTV 설치 시 1회** 할 일이다.
+`python -X utf8 -m pipeline.calib`가 `cameras.json`의 `camera_id`별로 `pipeline/calib/{camera_id}.json`(설치 높이·pitch·yaw·roll·화각·해상도)을
+저장하고, `summarize`는 그 파일로 스케일을 만든다(없으면 그 자리에서 만들어 저장). 지금 저장하는 값은 eval과 같은 bbox_h 보정이라 push 결과는 동일하며,
+lane 소실점 보정(클립당 ~10초)으로 정해지면 `compute_camera()`의 계산만 바꾼다. 선행 조건: `eval.run.predict_det`의 lane 분기와 `judge.MARGIN_M['det']['lane']`(판정 담당).
+
+지표 변동 이력: 이관 366건(10/31) → 450건(11/2)은 변정은 `SCALE_FALLBACK`(ba8f2ec) 반영으로 S32(검출 없음, 설치 정보 대체 스케일) 150프레임이 이관으로 바뀐 것이다. 조서희 측정 수정(lane-vp)은 det 결과를 바꾸지 않았다(det 경로는 같은 검사를 가진 `judge.occupancy.residual_width` 사용).
 
 입력 가정: `summarize.py`가 gt 파일에서 읽는 것은 **카메라 설치 정보(높이·화각)와 단면 도로 경계 px**뿐이다 — judge/eval과 같은 "CCTV 설치 시 1회 측량한 값" 가정이며, 정답 잔여 폭·차량 좌표는 쓰지 않는다.
 

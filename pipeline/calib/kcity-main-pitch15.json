@@ -1,0 +1,15 @@
+{
+  "camera_id": "kcity-main-pitch15",
+  "computed_at": "2026-11-02",
+  "source_clip": "S33",
+  "method": "bbox_h",
+  "camera": {
+    "width_px": 1920,
+    "height_px": 1080,
+    "hfov_deg": 70.0,
+    "h": 3.4743665793786107,
+    "pitch": 0.26294612010182006,
+    "yaw": 0.13275793229454838,
+    "roll": -0.030070721007573967
+  }
+}

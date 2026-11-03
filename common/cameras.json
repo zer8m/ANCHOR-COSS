@@ -1,5 +1,5 @@
 {
-  "_comment": "clip → camera_id. 같은 CCTV(설치 위치·자세)로 찍은 클립은 같은 id. 스케일 보정(bbox 누적)과 차선 소실점은 같은 camera_id 의 클립끼리만 합친다. 납품 38클립은 pitch −15° 본선 카메라 한 대를 여러 장면에 재사용한 것(36클립)이고, S31(−10°)·S32(−25°)는 자세가 달라 별도 id. pipeline/cameras.json 의 camera_id 와 같은 이름을 쓴다. 새 납품 클립은 여기에 한 줄 추가(없으면 eval.run 이 오류).",
+  "_comment": "clip → camera_id. 같은 CCTV(설치 위치·자세)로 찍은 클립은 같은 id. 스케일 보정(bbox 누적)과 차선 소실점은 같은 camera_id 의 클립끼리만 합친다. 납품 38클립은 pitch −15° 본선 카메라 한 대를 여러 장면에 재사용한 것(36클립)이고, S31(−10°)·S32(−25°)는 자세가 달라 별도 id. 이 파일이 clip → camera_id 의 유일한 출처다(eval·pipeline 모두 여기서 읽고, pipeline/cameras.json 에는 camera_id 를 적지 않는다). 새 납품 클립은 여기에 한 줄 추가(없으면 eval.run 이 오류).",
   "clips": {
     "S01": "kcity-main-pitch15",
     "S02": "kcity-main-pitch15",

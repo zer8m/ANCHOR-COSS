@@ -50,7 +50,7 @@
 ## 카메라 묶음 (`common/cameras.json`)
 스케일 보정(bbox 누적)과 차선 소실점은 같은 CCTV 의 클립끼리만 합친다. `eval.run._camera_group` 은 `common/cameras.json` 의
 clip → camera_id 표를 읽는다(납품 38클립: 본선 pitch −15° 36클립 `kcity-main-pitch15`, S31 `…pitch10`, S32 `…pitch25`).
-표에 없는 클립은 오류다. 새 납품 클립은 표에 한 줄 추가. `pipeline/cameras.json` 의 camera_id 와 같은 이름을 쓴다.
+표에 없는 클립은 오류다. 새 납품 클립은 표에 한 줄 추가. 이 표가 clip → camera_id 의 유일한 출처다(`pipeline` 도 같은 표를 읽고, `pipeline/cameras.json` 에는 camera_id 를 적지 않는다).
 
 ## 테스트 (pytest 불필요)
 `python -X utf8 -m judge.test_decide` · `judge.test_handoff` · `eval.test_cameras`

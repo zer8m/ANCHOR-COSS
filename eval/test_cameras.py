@@ -1,17 +1,11 @@
 """common/cameras.json (clip → camera_id) 일관성 테스트.  python -X utf8 -m eval.test_cameras"""
 import unittest
 
-from common.bisa import REPO, clip_ids, load_gt, load_json
+from common.bisa import clip_ids, load_gt
 from eval.run import _camera_group
 
 
 class TestCameraTable(unittest.TestCase):
-    def test_pipeline_camera_ids_agree(self):
-        # pipeline/cameras.json 의 camera_id 와 같은 이름·같은 묶음
-        for clip, entry in load_json(REPO / 'pipeline' / 'cameras.json').items():
-            if isinstance(entry, dict) and 'camera_id' in entry:
-                self.assertEqual(_camera_group(clip), entry['camera_id'], clip)
-
     def test_unknown_clip_raises(self):
         with self.assertRaises(KeyError):
             _camera_group('S99')

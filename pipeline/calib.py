@@ -1,6 +1,6 @@
 """카메라 보정 캐시 — CCTV 설치 시 1회 계산해 pipeline/calib/{camera_id}.json 에 두고, 이후엔 읽기만 한다.
 
-    python -X utf8 -m pipeline.calib            # cameras.json 의 모든 camera_id 보정(이미 있으면 건너뜀)
+    python -X utf8 -m pipeline.calib            # cameras.json 의 클립이 속한 모든 camera_id 보정(이미 있으면 건너뜀)
     python -X utf8 -m pipeline.calib --force    # 다시 계산
 
 지금은 bbox 자기보정 + 설치 높이(bbox_h, eval.run 과 같은 묶음·같은 결과)를 저장한다.
@@ -81,9 +81,9 @@ def main():
     p.add_argument('--force', action='store_true')
     a = p.parse_args()
     done = set()
-    for clip_id, cam in CAMERAS.items():
-        cid = cam.get('camera_id')
-        if not cid or cid in done:
+    for clip_id in CAMERAS:
+        cid = _camera_group(clip_id)
+        if cid in done:
             continue
         done.add(cid)
         print(f'{cid}: ' + ('계산·저장' if save(cid, clip_id, a.force) else '이미 있음(--force 로 재계산)') + f' ← {clip_id}')

@@ -26,8 +26,8 @@ from pathlib import Path
 
 import numpy as np
 
-from common.bisa import REPO, clip_ids, load_det, load_gt, validator, vehicle_widths
-from judge.occupancy import OCC_MEMORY_FRAMES, OccupancyMemory, footprints, residual_width
+from common.bisa import REPO, clip_ids, load_det, load_gt, load_json, validator, vehicle_widths
+from judge.occupancy import OCC_MEMORY_FRAMES, OccupancyMemory, footprints
 from scale import estimate_naive_scale, estimate_scale, measure_section
 from scale.bbox_calib import calibrate, collect_boxes
 from scale.lane_vp import lane_camera
@@ -37,9 +37,17 @@ ESTIMATORS = {'naive': estimate_naive_scale, 'vp': estimate_scale}
 SCALES = ['naive', 'vp', 'bbox', 'bbox_h', 'lane']
 
 
+@lru_cache
+def _camera_table():
+    return load_json(REPO / 'common' / 'cameras.json')['clips']
+
+
 def _camera_group(clip_id):
-    """같은 CCTV로 본 클립 묶음(운영에선 카메라 ID). 여기선 설치 pitch로 대신 구분: S31·S32만 다름."""
-    return round(load_gt(clip_id)['camera']['pitch_deg'])
+    """같은 CCTV 로 본 클립 묶음 = camera_id (common/cameras.json 의 clip → camera_id 표). 표에 없는 클립은 오류."""
+    try:
+        return _camera_table()[clip_id]
+    except KeyError:
+        raise KeyError(f'common/cameras.json 에 {clip_id} 의 camera_id 가 없다') from None
 
 
 @lru_cache
@@ -102,11 +110,11 @@ def predict_gt(gt, scale_name):
 
 def predict_det(gt, det, scale_name, occ, memory=OCC_MEMORY_FRAMES):
     """det 입력: det bbox(점유)와 설치 시 측량한 도로 경계 px(= GT edge px, 가정). 차종·정답 폭은 쓰지 않는다."""
-    use_h = scale_name == 'bbox_h'
-    cam = _bbox_camera(_camera_group(gt['clip_id']), use_h)
+    group = _camera_group(gt['clip_id'])
+    cam = _lane_camera(group) if scale_name == 'lane' else _bbox_camera(group, scale_name == 'bbox_h')   # lane: 차선 소실점 + 설치 높이
     if cam is None:
         scale = scale_from_camera(gt['camera'])
-        scale.source = 'camera(검출 없음)'
+        scale.source = 'camera(차선 없음)' if scale_name == 'lane' else 'camera(검출 없음)'
         c = gt['camera']
         f_h = c['width_px'] / 2 / np.tan(np.radians(c['hfov_deg'] / 2)) * c['height_from_road_m']
         fit_cam = None
@@ -117,15 +125,15 @@ def predict_det(gt, det, scale_name, occ, memory=OCC_MEMORY_FRAMES):
     for f in gt['frames']:
         fps = mem.update(footprints(dframes.get(f['frame'], []), scale, f_h, fit_cam))
         for s in f['sections']:
-            res, road = residual_width(scale, s['left_edge']['px'], s['right_edge']['px'], fps)
+            res, road = measure_section(scale, s['left_edge']['px'], s['right_edge']['px'], fps)
             preds.append(dict(frame=f['frame'], section_id=s['section_id'],
                               residual_width_m=max(float(res), 0.0), road_width_m=float(road)))
     return {'clip_id': gt['clip_id'], 'predictions': preds}, scale
 
 
 def run(source, scale_name, clips, out_dir, occ=2, memory=OCC_MEMORY_FRAMES):
-    if source == 'det' and not scale_name.startswith('bbox'):
-        raise SystemExit('--source det 는 --scale bbox / bbox_h 만 가능(vp 는 GT footprint 가 필요)')
+    if source == 'det' and not (scale_name.startswith('bbox') or scale_name == 'lane'):
+        raise SystemExit('--source det 는 --scale bbox / bbox_h / lane 만 가능(vp 는 GT footprint 가 필요)')
     v = validator()
     rows = []
     for c in clips:

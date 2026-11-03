@@ -22,7 +22,9 @@ PASS, FAIL, HANDOFF = '통과', '불가', '관제이관'
 #      bbox_h 10 cm(GT 최대 과대추정 8.8 cm).
 #  det (운용; 점유 = det bbox): bbox_h 20 cm. 38클립 위험 통과 0 이면서 3.3 m 차종 우회가 늘지 않는 상한(30 cm 부터 139건).
 #      det 최대 과대추정은 S05 +50 cm 라 20 cm 도 SUV·트럭은 못 막는다(judge/README.md 한계).
-MARGIN_M = {'gt': {'vp': 0.05, 'bbox_h': 0.10}, 'det': {'bbox_h': 0.20}}
+#      lane (제안, 미채택): det 최대 과대추정 -1.1 cm(과소 편향 -39 cm 중앙값)라 0 으로도 위험 통과 0 이지만, 잡음 여유로 5 cm.
+#      bbox_h 대비 불필요 우회가 늘어난다(eval.lane_compare 표 참고). 파이프라인 기본은 bbox_h 그대로.
+MARGIN_M = {'gt': {'vp': 0.05, 'bbox_h': 0.10}, 'det': {'bbox_h': 0.20, 'lane': 0.05}}
 
 
 def margin_m(scale_name, source='gt'):

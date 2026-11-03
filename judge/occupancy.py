@@ -10,22 +10,18 @@
 점유 기억(OccupancyMemory): 최근 15프레임에서 본 점유의 합집합을 쓴다. det bbox 는 1~2프레임씩 도로 옆 물체와
 합쳐져 아래 변이 튀는데(S05 f40: 445 → 519), 그 프레임만 보면 차가 단면과 안 만나 위험 쪽으로 +190 cm 틀린다.
 정지한 차는 몇 프레임 전에도 같은 자리에 있으므로 합집합이 이 글리치를 덮는다(떠난 차의 해제가 1초 늦어질 뿐).
-
-점유 구간을 |X| 에 비례해 부풀리는 장치(RHO_*)도 두었으나 스윕 결과 0 이 최선이었다. 부풀림은 위험 통과를 못 줄이고
-(원인이 횡위치 오차가 아니라 글리치) 불필요 우회만 키웠다. 상수는 재현용으로 남긴다.
 """
 from collections import deque
 
 import numpy as np
 
-from scale.bbox_calib import CAR
+from scale.bbox_calib import CAR, _box_bbox
 
 OCC_MIN_CONF, OCC_MIN_PIXELS = 0.4, 300   # 점유 후보 하한. 실차는 ≥0.5/≥580 px, 잡음은 대부분 이보다 작다
 COLLAPSE_PIXELS = 20000                   # 이보다 큰 저신뢰 덩어리는 분할 붕괴 → 점유로 안 쓰고 이관 쪽에서 처리
 LENGTH_SLACK_M = 0.5                      # 1단계 뒤쪽 연장에 더하는 여유
 FIT_TOL_PX = 15.0                         # 2단계 맞춤 최대 변 오차. 넘으면 1단계로 후퇴
 FIT_SLACK_M = 0.10                        # 2단계 차 폭 양쪽 여유(표준 차폭 ≠ 실제 차폭, bbox 노이즈)
-RHO_FIT, RHO_BOX = 0.0, 0.0              # 점유 구간 양 끝을 |X| 의 이 비율만큼 부풀림 (2단계 / 1단계). 스윕 결과 0
 OCC_MEMORY_FRAMES = 15                   # 최근 이 프레임 수(+현재)의 점유 합집합. K≥3 부터 위험 통과 0 이었고 15 는 5배 여유
 
 
@@ -58,22 +54,18 @@ def ground_point(cam, px):
     return t * d_w[0], t * d_w[1]
 
 
-def _car_corners(X, Y, w, l, h):
-    return np.array([[X + sx * w / 2, Y + sy * l / 2, z] for sx in (-1, 1) for sy in (-1, 1) for z in (0, h)])
-
-
-def _bbox_of(cam, X, Y):
-    uv = cam.project(_car_corners(X, Y, CAR['width_m'], CAR['length_m'], CAR['height_m']))
-    return np.r_[uv.min(0), uv.max(0)]
-
-
 _FIT_CACHE = {}
+
+
+def _cam_key(cam):
+    """카메라 파라미터 값으로 만든 캐시 키(객체 id 는 재사용될 수 있고, 같은 보정을 다시 읽은 카메라와 캐시를 공유하지 못한다)."""
+    return (cam.f, *cam.c, cam.h, cam.pitch, cam.yaw, cam.roll)
 
 
 def fit_car(cam, bbox, comps=(0, 1, 2, 3)):
     """bbox 의 comps 번째 변(0 좌, 1 위, 2 우, 3 아래)에 표준 승용차 투영을 맞춘다.
     반환: (X, Y, 최대 변 오차 px) 또는 None. 정지한 차의 반복 프레임을 위해 bbox 를 2 px 단위로 묶어 캐시한다."""
-    key = (id(cam), tuple(int(round(v / 2)) for v in bbox), comps)
+    key = (_cam_key(cam), tuple(int(round(v / 2)) for v in bbox), comps)
     if key in _FIT_CACHE:
         return _FIT_CACHE[key]
     bbox, idx = np.asarray(bbox, float), list(comps)
@@ -83,19 +75,19 @@ def fit_car(cam, bbox, comps=(0, 1, 2, 3)):
         for dy in (CAR['length_m'] / 2, 0.0, CAR['length_m']):   # 아래 변이 차 앞/뒤 어느 쪽인지 모르므로 초기값 여러 개
             p, lam = np.array([g[0], g[1] + dy]), 1e-2
             for _ in range(15):
-                r = (_bbox_of(cam, *p) - bbox)[idx]
+                r = (_box_bbox(cam, *p, CAR) - bbox)[idx]
                 J = np.empty((len(idx), 2))
                 for i in range(2):
                     e = np.zeros(2); e[i] = 1e-3
-                    J[:, i] = ((_bbox_of(cam, *(p + e)) - _bbox_of(cam, *p)) / 1e-3)[idx]
+                    J[:, i] = ((_box_bbox(cam, *(p + e), CAR) - _box_bbox(cam, *p, CAR)) / 1e-3)[idx]
                 step = np.linalg.solve(J.T @ J + lam * np.eye(2), -J.T @ r)
-                if np.abs((_bbox_of(cam, *(p + step)) - bbox)[idx]).max() < np.abs(r).max():
+                if np.abs((_box_bbox(cam, *(p + step), CAR) - bbox)[idx]).max() < np.abs(r).max():
                     p, lam = p + step, lam / 3
                     if np.abs(step).max() < 1e-4:
                         break
                 else:
                     lam *= 5
-            err = float(np.abs((_bbox_of(cam, *p) - bbox)[idx]).max())
+            err = float(np.abs((_box_bbox(cam, *p, CAR) - bbox)[idx]).max())
             if best is None or err < best[2]:
                 best = (float(p[0]), float(p[1]), err)
             if best[2] < FIT_TOL_PX / 3:   # 충분히 맞으면 다른 초기값은 시도하지 않는다(속도)
@@ -117,17 +109,16 @@ def stage2_quad(cam, bbox):
 
 
 def footprints(detections, scale, f_h, cam=None):
-    """점유 후보마다 (지면 다각형 (X, D), 부풀림 비율). cam 이 있으면 2단계(맞춤 실패 시 1단계), 없으면 1단계."""
+    """점유 후보마다 footprint px 4점(scale.measure_section 입력). cam 이 있으면 2단계(맞춤 실패 시 1단계), 없으면 1단계."""
     out = []
     for d in detections:
         if not _is_candidate(d):
             continue
         quad = stage2_quad(cam, d['bbox_px']) if cam is not None else None
-        rho = RHO_FIT
         if quad is None:
-            quad, rho = stage1_quad(scale, f_h, d['bbox_px']), RHO_BOX
+            quad = stage1_quad(scale, f_h, d['bbox_px'])
         if quad is not None and np.all((quad - scale.vp) @ scale.n_dir > 0):
-            out.append((scale.to_ground(quad), rho))
+            out.append(quad)
     return out
 
 
@@ -137,11 +128,14 @@ class OccupancyMemory:
     def __init__(self, frames=OCC_MEMORY_FRAMES):
         self.hist = deque(maxlen=frames + 1)
 
-    def update(self, items):
-        self.hist.append(items)
-        return [it for h in self.hist for it in h]
+    def update(self, quads):
+        self.hist.append(quads)
+        return [q for h in self.hist for q in h]
 
 
+# ── 임시 호환 함수: scale/exp_mask_side.py 전용 ────────────────────────────────────────────
+# 서희가 scale.measure_section 이 지면 다각형도 받게 옮기면 아래 두 함수를 삭제한다.
+# judge/·eval/ 코드는 이 함수를 쓰지 않는다(그쪽은 footprints() 의 px 4점 + scale.measure_section).
 def _interval_at(ground_poly, depth):
     """지면 다각형 (X, D) 와 깊이 D=depth 횡단선의 교차 구간. 안 겹치면 None."""
     X, D = ground_poly
@@ -156,12 +150,8 @@ def _interval_at(ground_poly, depth):
     return (min(xs), max(xs)) if len(xs) >= 2 else None
 
 
-# 임시: scale.measure_section 이 도로 밖 덩어리를 걸러내도록 수정되면(scale/measure.py:29, a < b 검사)
-# 이 함수와 _interval_at 을 삭제하고 scale.measure_section 을 쓴다. items 는 (지면 다각형, rho) 라서 호출부도 바꿔야 한다.
 def residual_width(scale, left_px, right_px, items):
-    """scale.measure_section 과 같은 계산 + 도로 밖 덩어리 제거.
-    measure_section 은 도로 경계로 자른 구간이 뒤집혀도(a > b, 덩어리가 도로 밖) 걸러내지 않아
-    존재하지 않는 빈 구간이 생긴다. GT 모드에서는 차가 항상 도로 안이라 드러나지 않았다."""
+    """items = [(지면 다각형 (X, D), rho)]. 도로 밖 덩어리 제거 포함. scale/exp_mask_side.py 전용."""
     ex, ed = scale.to_ground([left_px, right_px])
     lo, hi = sorted(ex)
     depth = float(np.mean(ed))

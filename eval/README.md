@@ -32,3 +32,11 @@
 - **스트레스(gt 전용)**: det 가 놓친 차를 점유에서 뺀 최악 경우에서 이관 감지가 놓친 프레임의 위험 통과(평가 전용).
 
 스케일여유는 모드별이다(`judge.margin_m`): gt vp 5 cm·bbox_h 10 cm, det bbox_h 20 cm.
+
+## 카메라 묶음 (`common/cameras.json`)
+스케일 보정(bbox 누적)과 차선 소실점은 같은 CCTV 의 클립끼리만 합친다. `eval.run._camera_group` 은 `common/cameras.json` 의
+clip → camera_id 표를 읽는다(납품 38클립: 본선 pitch −15° 36클립 `kcity-main-pitch15`, S31 `…pitch10`, S32 `…pitch25`).
+표에 없는 클립은 오류다. 새 납품 클립은 표에 한 줄 추가. `pipeline/cameras.json` 의 camera_id 와 같은 이름을 쓴다.
+
+## 테스트 (pytest 불필요)
+`python -X utf8 -m judge.test_decide` · `judge.test_handoff` · `eval.test_cameras`

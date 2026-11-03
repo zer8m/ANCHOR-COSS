@@ -282,7 +282,7 @@ def compare(clips):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument('--scale', nargs='+', default=None, choices=list(MARGIN_M['gt']))
+    p.add_argument('--scale', nargs='+', default=None, choices=sorted({k for d in MARGIN_M.values() for k in d}))
     p.add_argument('--clips', nargs='*')
     p.add_argument('--source', default='gt', choices=['gt', 'det'])
     p.add_argument('--occ', type=int, choices=[1, 2], default=2)

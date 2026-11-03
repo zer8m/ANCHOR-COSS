@@ -13,7 +13,7 @@
 from collections import defaultdict
 
 from common.bisa import REPO, load_det, load_gt, load_json
-from eval.run import bbox_scale
+from eval.run import _camera_group
 from judge import SCALE_FALLBACK, HandoffMonitor, frame_reasons, section_geometry
 from pipeline.calib import calib_path, save, scale_from_calib
 
@@ -27,11 +27,8 @@ CAMERAS = {k: {kk: vv for kk, vv in v.items() if not kk.startswith('_')}
 
 
 def camera_scale(clip_id, gt):
-    """이 클립 카메라의 스케일. camera_id 가 있으면 보정 캐시(pipeline/calib/)를 쓰고, 없으면 그 자리에서 만든다.
-    camera_id 가 없는 클립은 eval 과 같은 방식(pitch 묶음 bbox_h)으로 매번 계산."""
-    cid = CAMERAS.get(clip_id, {}).get('camera_id')
-    if not cid:
-        return bbox_scale(gt, use_height=True)
+    """이 클립 카메라의 스케일 = 보정 캐시(pipeline/calib/{camera_id}.json). camera_id 는 common/cameras.json(eval 과 같은 표)."""
+    cid = _camera_group(clip_id)
     if not calib_path(cid).exists():
         save(cid, clip_id)
         print(f'[calib] {cid} 보정 캐시 생성 ← {clip_id}')
